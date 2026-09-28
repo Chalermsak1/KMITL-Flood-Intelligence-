@@ -53,7 +53,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       return;
     }
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
     try {
       const sse = new EventSource(`${apiBase}/api/v1/realtime/events`);
       sse.onopen = () => {
@@ -91,7 +91,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const connect = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/ws/live";
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8001/ws/live";
     try {
       const ws = new WebSocket(wsUrl);
 

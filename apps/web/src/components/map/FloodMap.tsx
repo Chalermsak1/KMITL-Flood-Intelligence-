@@ -32,13 +32,33 @@ export const FloodMap: React.FC<FloodMapProps> = ({
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [webGlSupported, setWebGlSupported] = useState(true);
 
   // Default coordinate center: KMITL Campus, Lat Krabang
   const defaultLng = 100.7782;
   const defaultLat = 13.7298;
 
   useEffect(() => {
+    const hasWebGL = (() => {
+      try {
+        const canvas = document.createElement("canvas");
+        return !!(window.WebGLRenderingContext && (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")));
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!hasWebGL) {
+      setWebGlSupported(false);
+      return;
+    }
+
     if (!mapContainer.current || mapRef.current) return;
+
+    const tileStyleUrl = highContrast
+      ? "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"
+      : "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png";
 
     const map = new maplibregl.Map({
       container: mapContainer.current,
@@ -48,8 +68,9 @@ export const FloodMap: React.FC<FloodMapProps> = ({
           osm: {
             type: "raster",
             tiles: [
-              "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png",
-              "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+              tileStyleUrl,
+              "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+              "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"
             ],
             tileSize: 256,
             attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
@@ -66,8 +87,8 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         ]
       },
       center: [defaultLng, defaultLat],
-      zoom: 13.5,
-      pitch: 25,
+      zoom: 14,
+      pitch: 0,
       attributionControl: false
     });
 
@@ -75,6 +96,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
 
     map.on("load", () => {
+      setIsMapLoaded(true);
       map.resize();
       // Add Satellite SAR Water Polygons GeoJSON source
       map.addSource("satellite-water", {
@@ -91,8 +113,8 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         source: "satellite-water",
         layout: { visibility: "visible" },
         paint: {
-          "fill-color": "#8b5cf6",
-          "fill-opacity": 0.35
+          "fill-color": "#3b82f6",
+          "fill-opacity": 0.4
         }
       });
 
@@ -102,12 +124,19 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         source: "satellite-water",
         layout: { visibility: "visible" },
         paint: {
-          "line-color": "#a78bfa",
+          "line-color": "#2563eb",
           "line-width": 2,
           "line-dasharray": [2, 1]
         }
       });
     });
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.resize();
+    });
+    if (mapContainer.current) {
+      resizeObserver.observe(mapContainer.current);
+    }
 
     const resizeTimer = setTimeout(() => {
       map.resize();
@@ -117,10 +146,12 @@ export const FloodMap: React.FC<FloodMapProps> = ({
 
     return () => {
       clearTimeout(resizeTimer);
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
+      setIsMapLoaded(false);
     };
-  }, []);
+  }, [highContrast]);
 
   // Update Satellite Layer
   useEffect(() => {
@@ -168,7 +199,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
   // Update Interactive DOM Markers
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !isMapLoaded) return;
 
     // Clear old markers
     markersRef.current.forEach((m) => m.remove());
@@ -347,11 +378,33 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         markersRef.current.push(marker);
       });
     }
-  }, [incidents, reports, waterStations, shelters, layers, onSelectIncident]);
+  }, [isMapLoaded, incidents, reports, waterStations, shelters, layers, onSelectIncident]);
+
+  if (!webGlSupported) {
+    return (
+      <div className={`relative w-full h-full min-h-[500px] flex flex-col items-center justify-center bg-surface p-6 text-center ${className || ""}`}>
+        <div className="max-w-md bg-surface-card border border-surface-border p-6 rounded-2xl shadow-2xl">
+          <div className="text-3xl mb-3">🗺️</div>
+          <h3 className="text-base font-bold text-white mb-2">แผนที่สถานการณ์น้ำท่วม (WebGL Not Supported)</h3>
+          <p className="text-xs text-gray-400 mb-4">
+            เบราว์เซอร์ของคุณยังไม่ได้เปิดใช้การเร่งความเร็วกราฟิก (Hardware WebGL) ระบบจึงแสดงข้อมูลสรุปสถานการณ์แบบรายการด้านล่าง
+          </p>
+          <div className="text-left space-y-2 max-h-60 overflow-y-auto pr-1">
+            {incidents.map((inc) => (
+              <div key={inc.id} className="p-2.5 rounded-lg bg-orange-950/40 border border-orange-500/30 text-xs">
+                <div className="font-bold text-orange-400">⚠️ #{inc.incident_number}: {inc.title}</div>
+                <div className="text-gray-300 text-[11px] mt-1">ระดับน้ำ: {inc.consensus_depth_band} | รถผ่าน: {inc.consensus_passability}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`relative w-full h-full ${className || ""}`}>
-      <div ref={mapContainer} className="w-full h-full" />
+    <div className={`relative w-full h-full min-h-[500px] ${className || ""}`}>
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
     </div>
   );
 };

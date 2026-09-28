@@ -100,10 +100,11 @@ async def test_queue_redis_failure_and_disk_spool_recovery(tmp_path):
     # Simulate container/process restart: initialize a new queue instance pointing to same spool
     queue2 = DurableQueue(spool_file=test_spool)
     assert len(queue2._in_memory_queue) == 1
-    recovered_job = await queue2.dequeue(timeout_sec=1)
-    assert recovered_job is not None
-    assert recovered_job["job_id"] == job_id
-    assert recovered_job["payload"]["report_id"] == "rep-test-recovery-123"
+    with patch.object(queue2, "get_redis", return_value=None):
+        recovered_job = await queue2.dequeue(timeout_sec=1)
+        assert recovered_job is not None
+        assert recovered_job["job_id"] == job_id
+        assert recovered_job["payload"]["report_id"] == "rep-test-recovery-123"
 
 
 @pytest.mark.asyncio

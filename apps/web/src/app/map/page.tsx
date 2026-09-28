@@ -1,7 +1,20 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { FloodMap } from "../../components/map/FloodMap";
+import dynamic from "next/dynamic";
+
+const FloodMap = dynamic(
+  () => import("../../components/map/FloodMap").then((mod) => mod.FloodMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full min-h-[500px] flex flex-col items-center justify-center bg-surface-card text-gray-400 gap-3">
+        <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <p className="font-mono text-xs text-primary-400">กำลังเชื่อมต่อแผนที่สถานการณ์น้ำท่วม (Loading Live Map)...</p>
+      </div>
+    ),
+  }
+);
 import { LayerControl, LayerState } from "../../components/map/LayerControl";
 import { api } from "../../lib/api";
 import { Incident, FloodReport, WaterStation, AssistancePoint, SatelliteObservation, WebSocketEvent } from "../../lib/types";
@@ -81,16 +94,16 @@ export default function MapPage() {
   // Load non-satellite data (fast, always loaded)
   const loadCoreData = useCallback(async () => {
     try {
-      const [incRes, repRes, waterRes, shelterRes] = await Promise.all([
+      const [incRes, repRes, waterRes, shelterRes] = await Promise.allSettled([
         api.getIncidents(),
         api.getReports(),
         api.getWaterStations(),
         api.getShelters(),
       ]);
-      setIncidents(incRes.data);
-      setReports(repRes.data);
-      setWaterStations(waterRes.data);
-      setShelters(shelterRes.data);
+      if (incRes.status === "fulfilled" && incRes.value?.data) setIncidents(incRes.value.data);
+      if (repRes.status === "fulfilled" && repRes.value?.data) setReports(repRes.value.data);
+      if (waterRes.status === "fulfilled" && waterRes.value?.data) setWaterStations(waterRes.value.data);
+      if (shelterRes.status === "fulfilled" && shelterRes.value?.data) setShelters(shelterRes.value.data);
       setLastUpdated(new Date());
     } catch (err) {
       console.error("Map data refresh error:", err);
