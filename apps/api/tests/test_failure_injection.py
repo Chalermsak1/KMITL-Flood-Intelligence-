@@ -56,12 +56,13 @@ async def test_failure_injection_satellite_unavailable():
 
 
 @pytest.mark.asyncio
-async def test_failure_injection_redis_unavailable():
+async def test_failure_injection_redis_unavailable(tmp_path):
     """
     Failure Injection: Redis down.
     DurableQueue must catch connection failure and not crash the process.
     """
-    dq = DurableQueue()
+    spool_file = str(tmp_path / "spool.jsonl")
+    dq = DurableQueue(spool_file=spool_file)
     with patch.object(dq, "get_redis", side_effect=Exception("Redis node unreachable")):
         job_id = await dq.enqueue("REPORT_CLUSTER", {"test": 123})
         # Graceful return with fallback job ID

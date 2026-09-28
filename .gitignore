@@ -57,3 +57,6 @@ yarn-error.log*
 
 # Docker
 *.docker.log
+
+# Queue Spool WAL
+*spool.jsonl
