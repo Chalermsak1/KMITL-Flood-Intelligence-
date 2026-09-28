@@ -2,15 +2,42 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, Camera, CheckCircle2, AlertCircle, ArrowLeft, Navigation } from "lucide-react";
+import { MapPin, CheckCircle2, AlertCircle, ArrowLeft, Navigation, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { api } from "../../lib/api";
+
+// GPS accuracy thresholds
+const GPS_HIGH_ACCURACY_M = 20;   // green  — precise enough to locate building
+const GPS_LOW_ACCURACY_M  = 50;   // orange — jitter may displace marker across road
+
+function GpsAccuracyBadge({ accuracy }: { accuracy: number | null }) {
+  if (accuracy === null) return null;
+  const isHigh = accuracy <= GPS_HIGH_ACCURACY_M;
+  const isMed  = accuracy <= GPS_LOW_ACCURACY_M;
+  const color  = isHigh ? "emerald" : isMed ? "yellow" : "red";
+  const label  = isHigh ? "HIGH" : isMed ? "MODERATE" : "LOW";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold
+        ${
+          isHigh ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+          : isMed ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+          : "bg-red-500/20 text-red-400 border border-red-500/30"
+        }`}
+      title={`GPS horizontal accuracy: ±${Math.round(accuracy)} m`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full bg-${color}-400 animate-pulse`} />
+      GPS {label} (±{Math.round(accuracy)} m)
+    </span>
+  );
+}
 
 export default function ReportPage() {
   const router = useRouter();
 
   const [lat, setLat] = useState<number>(13.7298);
   const [lng, setLng] = useState<number>(100.7782);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsStatus, setGpsStatus] = useState<string>("Locating your GPS...");
   const [waterDepth, setWaterDepth] = useState<string>("20_TO_40CM");
   const [passability, setPassability] = useState<string>("DIFFICULT");
@@ -56,14 +83,25 @@ export default function ReportPage() {
         (pos) => {
           setLat(pos.coords.latitude);
           setLng(pos.coords.longitude);
-          setGpsStatus(`GPS Acquired: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`);
+          setGpsAccuracy(pos.coords.accuracy);
+          const acc = pos.coords.accuracy;
+          const quality = acc <= GPS_HIGH_ACCURACY_M ? "HIGH" : acc <= GPS_LOW_ACCURACY_M ? "MODERATE" : "LOW";
+          setGpsStatus(`GPS Acquired (${quality}) — ±${Math.round(acc)} m horizontal accuracy`);
         },
-        () => {
-          setGpsStatus("GPS Access Denied. Using KMITL Campus Center as default.");
+        (err) => {
+          setGpsAccuracy(null);
+          if (err.code === err.PERMISSION_DENIED) {
+            setGpsStatus("GPS Permission Denied. Using KMITL Campus Center as fallback.");
+          } else if (err.code === err.TIMEOUT) {
+            setGpsStatus("GPS Timeout. Using KMITL Campus Center as fallback.");
+          } else {
+            setGpsStatus("GPS Unavailable. Using KMITL Campus Center as fallback.");
+          }
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
+      setGpsAccuracy(null);
       setGpsStatus("Browser does not support Geolocation.");
     }
 
@@ -201,6 +239,25 @@ export default function ReportPage() {
                 </span>
               </div>
               <div className="text-xs font-mono text-gray-400">{gpsStatus}</div>
+
+              {/* GPS Accuracy Badge */}
+              {gpsAccuracy !== null && (
+                <div className="flex items-center gap-2">
+                  <GpsAccuracyBadge accuracy={gpsAccuracy} />
+                </div>
+              )}
+
+              {/* Low-accuracy warning: GPS jitter may displace marker */}
+              {gpsAccuracy !== null && gpsAccuracy > GPS_LOW_ACCURACY_M && (
+                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30 text-[11px] text-red-300 font-mono">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>GPS ACCURACY LOW (±{Math.round(gpsAccuracy)} m):</strong> Your location marker may be displaced up to {Math.round(gpsAccuracy)} m.
+                    Please verify and adjust coordinates using the fields below before submitting.
+                  </span>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <input
                   type="number"

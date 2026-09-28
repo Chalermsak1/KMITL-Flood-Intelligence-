@@ -75,6 +75,24 @@ export default function DataStatusPage() {
     };
   };
 
+  // P2-02: Tooltip explanations for data mode badges
+  // Addresses pilot finding: 2 users confused by "DEMO" tag without explanation.
+  const getModeTooltip = (status: string, mode: string): string => {
+    if (mode === "LIVE") {
+      return "LIVE: Real-time data is actively being received from this source. Freshness is within the stated update cadence.";
+    }
+    if (mode === "OBSERVATION") {
+      return "OBSERVATION: This is satellite or sensor imagery acquired at a specific point in time — NOT a continuous real-time feed. Acquisition time is shown separately. Do not use as a minute-by-minute flood depth indicator.";
+    }
+    if (mode === "DEMO" || status === "PENDING_ACCESS") {
+      return "DEMO / PENDING ACCESS: This source is not yet connected to real-time institutional data. Registration or API credentials are pending. Data shown is historical reference or synthetic and should NOT be used for emergency decisions.";
+    }
+    if (status === "UNAVAILABLE") {
+      return "UNAVAILABLE: This source is currently offline or returning errors. The platform operates in graceful degradation mode using other available sources.";
+    }
+    return `Status: ${status}. Mode: ${mode}.`;
+  };
+
   const formatAge = (seconds: number | null) => {
     if (seconds === null || seconds === undefined) return "Unknown";
     if (seconds < 60) return `${seconds}s ago`;
@@ -150,7 +168,9 @@ export default function DataStatusPage() {
                   </div>
 
                   <span
-                    className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded border whitespace-nowrap ${badge.bg} ${badge.text} ${badge.border}`}
+                    className={`text-[10px] font-mono font-bold px-2.5 py-1 rounded border whitespace-nowrap cursor-help ${badge.bg} ${badge.text} ${badge.border}`}
+                    title={getModeTooltip(src.status, src.mode)}
+                    aria-label={`Data mode: ${badge.label}. ${getModeTooltip(src.status, src.mode)}`}
                   >
                     {badge.label}
                   </span>

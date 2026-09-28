@@ -14,6 +14,7 @@ interface FloodMapProps {
   shelters: AssistancePoint[];
   satellite?: SatelliteObservation | null;
   onSelectIncident?: (incident: Incident) => void;
+  highContrast?: boolean;
   className?: string;
 }
 
@@ -25,6 +26,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
   shelters,
   satellite,
   onSelectIncident,
+  highContrast = false,
   className
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -143,6 +145,19 @@ export const FloodMap: React.FC<FloodMapProps> = ({
       }
     }
   }, [satellite, layers.satellite]);
+
+  // P2-01: High-contrast mode — boost satellite polygon opacity for daylight readability
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    try {
+      map.setPaintProperty("satellite-water-fill", "fill-opacity", highContrast ? 0.75 : 0.35);
+      map.setPaintProperty("satellite-water-outline", "line-width", highContrast ? 3 : 2);
+      map.setPaintProperty("satellite-water-outline", "line-color", highContrast ? "#c4b5fd" : "#a78bfa");
+    } catch {
+      // layer may not exist yet if map style not loaded
+    }
+  }, [highContrast]);
 
   // Update Interactive DOM Markers
   useEffect(() => {

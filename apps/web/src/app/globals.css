@@ -45,3 +45,40 @@ body {
 .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
   filter: invert(1);
 }
+
+/* ─── HIGH CONTRAST MAP MODE (P2-01: Outdoor Daylight) ──────────────────────── */
+/* Activated by JS toggle (.high-contrast-map on the map container wrapper) */
+/* Also activated when OS is set to "Increase Contrast" / Windows High Contrast */
+.high-contrast-map .maplibregl-map {
+  filter: contrast(1.15) saturate(1.35);
+}
+
+/* Ensure all flood marker badges remain readable in high contrast mode */
+.high-contrast-map [data-marker="incident"] {
+  border-width: 3px;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 16px rgba(234, 88, 12, 0.8);
+}
+
+/* WCAG forced-colors compatibility: emergency controls always visible */
+@media (forced-colors: active) {
+  .maplibregl-ctrl-group {
+    border: 2px solid ButtonText !important;
+  }
+
+  /* Emergency / SOS buttons must NEVER rely only on color */
+  [data-emergency="sos"] {
+    forced-color-adjust: none;
+    background-color: red;
+    color: white;
+    border: 3px solid white;
+  }
+}
+
+/* Sunlight readability: increase text shadows on badge overlays */
+@media (prefers-contrast: more) {
+  .maplibregl-popup-content {
+    background: #000000 !important;
+    border: 2px solid #ffffff !important;
+    color: #ffffff !important;
+  }
+}
