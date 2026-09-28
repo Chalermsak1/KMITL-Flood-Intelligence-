@@ -20,7 +20,8 @@ async def test_full_queue_lifecycle_trace(tmp_path):
     """
     timestamps = {}
     test_spool = str(tmp_path / "test_spool.jsonl")
-    queue = DurableQueue(spool_file=test_spool)
+    test_key = f"test:trace:jobs:{uuid.uuid4()}"
+    queue = DurableQueue(spool_file=test_spool, queue_key=test_key)
 
     # 1. Submitted
     report_id = str(uuid.uuid4())

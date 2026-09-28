@@ -76,16 +76,16 @@ class Incident(Base):
     centroid = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     report_count: Mapped[int] = mapped_column(Integer, default=1)
     consensus_depth_band: Mapped[WaterDepthBand] = mapped_column(
-        SQLEnum(WaterDepthBand, name="water_depth_band"), default=WaterDepthBand.UNKNOWN
+        SQLEnum(WaterDepthBand, native_enum=False), default=WaterDepthBand.UNKNOWN
     )
     consensus_passability: Mapped[VehiclePassability] = mapped_column(
-        SQLEnum(VehiclePassability, name="vehicle_passability"), default=VehiclePassability.UNKNOWN
+        SQLEnum(VehiclePassability, native_enum=False), default=VehiclePassability.UNKNOWN
     )
     confidence: Mapped[ConfidenceLevel] = mapped_column(
-        SQLEnum(ConfidenceLevel, name="confidence_level"), default=ConfidenceLevel.MEDIUM
+        SQLEnum(ConfidenceLevel, native_enum=False), default=ConfidenceLevel.MEDIUM
     )
     status: Mapped[IncidentStatus] = mapped_column(
-        SQLEnum(IncidentStatus, name="incident_status"), default=IncidentStatus.ACTIVE
+        SQLEnum(IncidentStatus, native_enum=False), default=IncidentStatus.ACTIVE
     )
     first_reported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     last_reported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -104,13 +104,13 @@ class FloodReport(Base):
     session_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     location = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     water_depth_band: Mapped[WaterDepthBand] = mapped_column(
-        SQLEnum(WaterDepthBand, name="water_depth_band"), nullable=False
+        SQLEnum(WaterDepthBand, native_enum=False), nullable=False
     )
     vehicle_passability: Mapped[VehiclePassability] = mapped_column(
-        SQLEnum(VehiclePassability, name="vehicle_passability"), default=VehiclePassability.UNKNOWN
+        SQLEnum(VehiclePassability, native_enum=False), default=VehiclePassability.UNKNOWN
     )
     transport_type: Mapped[TransportType] = mapped_column(
-        SQLEnum(TransportType, name="transport_type"), default=TransportType.CAR
+        SQLEnum(TransportType, native_enum=False), default=TransportType.CAR
     )
     description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     photo_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -121,14 +121,14 @@ class FloodReport(Base):
     ai_road_detected: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     ai_confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     ai_estimated_depth_band: Mapped[Optional[WaterDepthBand]] = mapped_column(
-        SQLEnum(WaterDepthBand, name="water_depth_band"), nullable=True
+        SQLEnum(WaterDepthBand, native_enum=False), nullable=True
     )
     verification_status: Mapped[str] = mapped_column(String(20), default="UNVERIFIED")
     confidence: Mapped[ConfidenceLevel] = mapped_column(
-        SQLEnum(ConfidenceLevel, name="confidence_level"), default=ConfidenceLevel.LOW
+        SQLEnum(ConfidenceLevel, native_enum=False), default=ConfidenceLevel.LOW
     )
     freshness: Mapped[ReportFreshness] = mapped_column(
-        SQLEnum(ReportFreshness, name="report_freshness"), default=ReportFreshness.FRESH
+        SQLEnum(ReportFreshness, native_enum=False), default=ReportFreshness.FRESH
     )
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -197,7 +197,7 @@ class SatelliteObservation(Base):
     water_polygons = mapped_column(Geometry(geometry_type="MULTIPOLYGON", srid=4326), nullable=False)
     spatial_resolution_meters: Mapped[float] = mapped_column(Float, default=30.0)
     confidence: Mapped[ConfidenceLevel] = mapped_column(
-        SQLEnum(ConfidenceLevel, name="confidence_level"), default=ConfidenceLevel.MEDIUM
+        SQLEnum(ConfidenceLevel, native_enum=False), default=ConfidenceLevel.MEDIUM
     )
     acquisition_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -213,7 +213,7 @@ class RiskObservation(Base):
     risk_level: Mapped[str] = mapped_column(String(20), nullable=False)  # LOW, MODERATE, HIGH, CRITICAL, UNKNOWN
     risk_score: Mapped[float] = mapped_column(Float, nullable=False)  # 0 to 100
     confidence: Mapped[ConfidenceLevel] = mapped_column(
-        SQLEnum(ConfidenceLevel, name="confidence_level"), default=ConfidenceLevel.MEDIUM
+        SQLEnum(ConfidenceLevel, native_enum=False), default=ConfidenceLevel.MEDIUM
     )
     data_quality: Mapped[str] = mapped_column(String(20), default="MEDIUM")
     contributing_factors: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -230,7 +230,7 @@ class Road(Base):
     elevation_m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     current_flood_exposure: Mapped[str] = mapped_column(String(20), default="UNKNOWN")
     current_depth_band: Mapped[WaterDepthBand] = mapped_column(
-        SQLEnum(WaterDepthBand, name="water_depth_band"), default=WaterDepthBand.UNKNOWN
+        SQLEnum(WaterDepthBand, native_enum=False), default=WaterDepthBand.UNKNOWN
     )
     latest_incident_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("incidents.id"), nullable=True
@@ -247,17 +247,17 @@ class HelpRequest(Base):
     contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     location = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     help_type: Mapped[HelpType] = mapped_column(
-        SQLEnum(HelpType, name="help_type"), nullable=False, default=HelpType.OTHER
+        SQLEnum(HelpType, native_enum=False), nullable=False, default=HelpType.OTHER
     )
     priority: Mapped[HelpPriority] = mapped_column(
-        SQLEnum(HelpPriority, name="help_priority"), default=HelpPriority.MEDIUM
+        SQLEnum(HelpPriority, native_enum=False), default=HelpPriority.MEDIUM
     )
     people_count: Mapped[int] = mapped_column(Integer, default=1)
     vulnerable_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     current_water_level: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[HelpStatus] = mapped_column(
-        SQLEnum(HelpStatus, name="help_status"), default=HelpStatus.OPEN
+        SQLEnum(HelpStatus, native_enum=False), default=HelpStatus.OPEN
     )
     assigned_to: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -28,9 +28,11 @@ class DurableQueue:
     - Jobs survive Worker fleet restart (spool/SQS retains pending unacknowledged jobs).
     """
 
-    def __init__(self, spool_file: str = SPOOL_FILE_PATH):
+    def __init__(self, spool_file: str = SPOOL_FILE_PATH, queue_key: str = QUEUE_KEY, dlq_key: str = QUEUE_DLQ):
         self._redis: Optional[aioredis.Redis] = None
         self._spool_file = spool_file
+        self._queue_key = queue_key
+        self._dlq_key = dlq_key
         self._in_memory_queue: List[Dict[str, Any]] = []
         self._restore_from_disk_spool()
 
@@ -119,9 +121,9 @@ class DurableQueue:
             r = await self.get_redis()
             serialized = json.dumps(job_data)
             if priority == "HIGH":
-                await r.lpush(QUEUE_KEY, serialized)
+                await r.lpush(self._queue_key, serialized)
             else:
-                await r.rpush(QUEUE_KEY, serialized)
+                await r.rpush(self._queue_key, serialized)
             logger.info(f"Enqueued job {job_id} to Redis [{job_type}] with priority {priority}")
         except Exception:
             # 3. Persistent Disk-Backed Spool Fallback (guarantees survival across process restarts)
@@ -138,7 +140,7 @@ class DurableQueue:
         # 1. Try Redis first
         try:
             r = await self.get_redis()
-            res = await r.blpop(QUEUE_KEY, timeout=timeout_sec)
+            res = await r.blpop(self._queue_key, timeout=timeout_sec)
             if res:
                 _, raw = res
                 return json.loads(raw)
@@ -171,7 +173,7 @@ class DurableQueue:
 
         try:
             r = await self.get_redis()
-            await r.rpush(QUEUE_DLQ, json.dumps(job_data))
+            await r.rpush(self._dlq_key, json.dumps(job_data))
             logger.warning(f"Moved job {job_data.get('job_id')} to Redis DLQ: {reason}")
         except Exception as e:
             logger.error(f"Failed to move job to DLQ: {e}")
@@ -183,8 +185,8 @@ class DurableQueue:
         redis_ok = False
         try:
             r = await self.get_redis()
-            redis_depth = await r.llen(QUEUE_KEY)
-            redis_dlq = await r.llen(QUEUE_DLQ)
+            redis_depth = await r.llen(self._queue_key)
+            redis_dlq = await r.llen(self._dlq_key)
             redis_ok = True
         except Exception:
             redis_ok = False
