@@ -75,6 +75,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
 
     map.on("load", () => {
+      map.resize();
       // Add Satellite SAR Water Polygons GeoJSON source
       map.addSource("satellite-water", {
         type: "geojson",
@@ -108,9 +109,14 @@ export const FloodMap: React.FC<FloodMapProps> = ({
       });
     });
 
+    const resizeTimer = setTimeout(() => {
+      map.resize();
+    }, 200);
+
     mapRef.current = map;
 
     return () => {
+      clearTimeout(resizeTimer);
       map.remove();
       mapRef.current = null;
     };
@@ -295,7 +301,53 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         markersRef.current.push(marker);
       });
     }
-  }, [incidents, waterStations, shelters, layers, onSelectIncident]);
+
+    // 4. Citizen Reports Layer
+    if (layers.reports && reports) {
+      reports.forEach((rep) => {
+        const el = document.createElement("div");
+        el.className = "cursor-pointer group";
+        const depthColor = rep.water_depth_band?.includes("ABOVE_60") || rep.water_depth_band?.includes("40_TO_60")
+          ? "bg-red-500"
+          : rep.water_depth_band?.includes("20_TO_40")
+          ? "bg-amber-500"
+          : "bg-blue-500";
+        el.innerHTML = `
+          <div class="relative flex flex-col items-center">
+            <div class="w-6 h-6 rounded-full ${depthColor} border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold">
+              💧
+            </div>
+            <div class="mt-0.5 bg-surface-card border border-surface-border text-[9px] font-mono px-1 rounded text-gray-200 whitespace-nowrap shadow">
+              ${rep.water_depth_band?.replace("DEPTH_", "").replace(/_/g, " ") || "น้ำท่วม"}
+            </div>
+          </div>
+        `;
+
+        const popupHTML = `
+          <div class="p-3 max-w-xs font-sans text-gray-200">
+            <div class="text-xs text-blue-400 font-bold mb-1">📢 CITIZEN FLOOD REPORT</div>
+            <div class="font-bold text-sm text-white mb-1">${rep.description || "รายงานน้ำท่วมขัง"}</div>
+            <div class="space-y-1 text-xs text-gray-300">
+              <div><b>ระดับน้ำ:</b> ${rep.water_depth_band?.replace("DEPTH_", "").replace(/_/g, " ") || "-"}</div>
+              <div><b>การสัญจร:</b> ${rep.vehicle_passability || "-"}</div>
+              <div><b>ยานพาหนะ:</b> ${rep.transport_type || "-"}</div>
+              <div><b>ความน่าเชื่อถือ:</b> ${rep.confidence || "-"}</div>
+              <div class="text-[10px] text-gray-400 mt-1">เวลาที่สังเกต: ${new Date(rep.observed_at).toLocaleTimeString()}</div>
+            </div>
+          </div>
+        `;
+
+        const popup = new maplibregl.Popup({ offset: 18, closeButton: false }).setHTML(popupHTML);
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([rep.longitude, rep.latitude])
+          .setPopup(popup)
+          .addTo(map);
+
+        markersRef.current.push(marker);
+      });
+    }
+  }, [incidents, reports, waterStations, shelters, layers, onSelectIncident]);
 
   return (
     <div className={`relative w-full h-full ${className || ""}`}>

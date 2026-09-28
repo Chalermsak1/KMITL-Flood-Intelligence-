@@ -168,6 +168,7 @@ async def seed():
 
         # 5. Seed Baseline Incidents & Reports
         incident_1 = Incident(
+            incident_number=1001,
             title="น้ำท่วมขังผิวถนนฉลองกรุง (หน้าประตูใหญ่ สจล.)",
             centroid="SRID=4326;POINT(100.7782 13.7298)",
             report_count=8,
