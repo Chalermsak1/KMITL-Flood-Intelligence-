@@ -7,7 +7,8 @@ from app.models.entities import (
     DataSource, DataIngestionLog, FloodReport, Incident,
     WaterStation, WaterObservation, RainObservation,
     SatelliteObservation, RiskObservation, Road,
-    HelpRequest, AssistancePoint, AuditLog
+    HelpRequest, AssistancePoint, AuditLog,
+    FloodEvent, EventSnapshot
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "DataSource", "DataIngestionLog", "FloodReport", "Incident",
     "WaterStation", "WaterObservation", "RainObservation",
     "SatelliteObservation", "RiskObservation", "Road",
-    "HelpRequest", "AssistancePoint", "AuditLog"
+    "HelpRequest", "AssistancePoint", "AuditLog",
+    "FloodEvent", "EventSnapshot"
 ]

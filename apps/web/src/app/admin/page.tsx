@@ -13,24 +13,27 @@ import {
   Activity
 } from "lucide-react";
 import { api } from "../../lib/api";
-import { Incident, HelpRequest, SituationSummary } from "../../lib/types";
+import { Incident, HelpRequest, SituationSummary, DataSourceStatus } from "../../lib/types";
 
 export default function AdminPage() {
   const [summary, setSummary] = useState<SituationSummary | null>(null);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [helpRequests, setHelpRequests] = useState<HelpRequest[]>([]);
+  const [dataSources, setDataSources] = useState<DataSourceStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     try {
-      const [sumRes, incRes, helpRes] = await Promise.all([
-        api.getSituationSummary(),
-        api.getIncidents(),
-        api.getHelpRequests()
+      const [sumRes, incRes, helpRes, statusRes] = await Promise.all([
+        api.getSituationSummary().catch(() => ({ data: null })),
+        api.getIncidents().catch(() => ({ data: [] })),
+        api.getHelpRequests().catch(() => ({ data: [] })),
+        api.getDataStatus().catch(() => ({ data: { sources: [] } }))
       ]);
-      setSummary(sumRes.data);
-      setIncidents(incRes.data);
-      setHelpRequests(helpRes.data);
+      if (sumRes.data) setSummary(sumRes.data);
+      if (incRes.data) setIncidents(incRes.data);
+      if (helpRes.data) setHelpRequests(helpRes.data);
+      if (statusRes.data?.sources) setDataSources(statusRes.data.sources);
     } catch (err) {
       console.error("Admin dashboard load error:", err);
     } finally {
@@ -114,54 +117,97 @@ export default function AdminPage() {
           <span>External Data Ingestion Pipeline & Health Telemetry</span>
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
+          {(dataSources.length > 0 ? dataSources : [
             {
-              name: "TMD Weather & Radar",
-              status: "AVAILABLE",
-              mode: "DEMO / MODEL",
-              lastRun: "3 min ago",
-              latency: "18 ms",
-              badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+              source_id: "SRC_TMD_WEATHER",
+              name: "TMD",
+              full_name: "Thai Meteorological Department",
+              status: "LIVE",
+              mode: "LIVE" as const,
+              last_updated: new Date().toISOString(),
+              data_age_seconds: 120,
+              latency_ms: 18,
+              error_rate: 0.0,
+              notes: "TMD Open Weather API & KMITL Station"
             },
             {
-              name: "BMA DDS Canal Gauges",
-              status: "AVAILABLE",
-              mode: "DEMO / MODEL",
-              lastRun: "5 min ago",
-              latency: "24 ms",
-              badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+              source_id: "SRC_BMA_DDS",
+              name: "BMA",
+              full_name: "BMA Dept of Drainage and Sewerage",
+              status: "PENDING_ACCESS",
+              mode: "DEMO" as const,
+              last_updated: new Date().toISOString(),
+              data_age_seconds: 300,
+              latency_ms: 24,
+              error_rate: 0.0,
+              notes: "Canal gauges mock active"
             },
             {
-              name: "Traffy Fondue Reports",
-              status: "AVAILABLE",
-              mode: "DEMO / MOCK",
-              lastRun: "12 min ago",
-              latency: "15 ms",
-              badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+              source_id: "SRC_TRAFFY_FONDUE",
+              name: "TRAFFY",
+              full_name: "Traffy Fondue Platform",
+              status: "MOCK_ONLY",
+              mode: "DEMO" as const,
+              last_updated: new Date().toISOString(),
+              data_age_seconds: 600,
+              latency_ms: 15,
+              error_rate: 0.0,
+              notes: "NECTEC OAuth2 pending"
             },
             {
-              name: "Copernicus Sentinel-1 SAR",
-              status: "OBSERVATIONAL",
-              mode: "EVIDENCE (14h)",
-              lastRun: "14 hours ago",
-              latency: "35 ms",
-              badge: "bg-purple-500/10 text-purple-400 border-purple-500/30"
+              source_id: "SRC_COPERNICUS_S1",
+              name: "SATELLITE",
+              full_name: "Copernicus Sentinel-1 SAR",
+              status: "AVAILABLE",
+              mode: "OBSERVATION" as const,
+              last_updated: new Date().toISOString(),
+              data_age_seconds: 50400,
+              latency_ms: 35,
+              error_rate: 0.0,
+              notes: "Observational evidence layer (Acquired ~14h ago)"
             }
-          ].map((src, i) => (
-            <div key={i} className="bg-surface/60 border border-surface-border/60 rounded-xl p-3.5 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-white">{src.name}</span>
-                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${src.badge}`}>
-                  {src.status}
-                </span>
+          ]).map((src) => {
+            const modeColors: Record<string, string> = {
+              LIVE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+              OBSERVATION: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+              DEMO: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+              STALE: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+              UNAVAILABLE: "bg-red-500/10 text-red-400 border-red-500/30"
+            };
+            const badgeClass = modeColors[src.mode] || "bg-gray-500/10 text-gray-400 border-gray-500/30";
+
+            const ageFormatted = src.data_age_seconds != null
+              ? src.data_age_seconds < 60
+                ? `${src.data_age_seconds}s ago`
+                : src.data_age_seconds < 3600
+                ? `${Math.floor(src.data_age_seconds / 60)} min ago`
+                : `${Math.floor(src.data_age_seconds / 3600)}h ago`
+              : "N/A";
+
+            return (
+              <div key={src.source_id} className="bg-surface/60 border border-surface-border/60 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-white truncate max-w-[150px]" title={src.full_name || src.name}>
+                    {src.name}
+                  </span>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${badgeClass}`}>
+                    {src.mode}
+                  </span>
+                </div>
+                <div className="text-[11px] font-mono text-gray-400 space-y-0.5">
+                  <div>Status: <span className="text-gray-200">{src.status}</span></div>
+                  <div>Data Age: <span className="text-gray-200">{ageFormatted}</span></div>
+                  <div>Latency: <span className="text-gray-200">{src.latency_ms} ms</span></div>
+                  <div>Error Rate: <span className="text-gray-200">{(src.error_rate * 100).toFixed(0)}%</span></div>
+                </div>
+                {src.notes && (
+                  <div className="text-[10px] text-gray-500 line-clamp-1 border-t border-surface-border/40 pt-1">
+                    {src.notes}
+                  </div>
+                )}
               </div>
-              <div className="text-[11px] font-mono text-gray-400 space-y-0.5">
-                <div>Mode: <span className="text-gray-200">{src.mode}</span></div>
-                <div>Last Sync: <span className="text-gray-200">{src.lastRun}</span></div>
-                <div>Ping: <span className="text-gray-200">{src.latency}</span></div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 

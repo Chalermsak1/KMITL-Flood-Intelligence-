@@ -33,10 +33,17 @@ class DataSource(Base):
     temporal_resolution_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     reliability_score: Mapped[float] = mapped_column(Float, default=0.8)
     attribution: Mapped[str] = mapped_column(Text, nullable=False)
-    license: Mapped[str] = mapped_column(Text, nullable=False)
+    license: Mapped[str] = mapped_column(Text, nullable=False, default="Open Data")
+    status: Mapped[str] = mapped_column(String(20), default="AVAILABLE")  # AVAILABLE, PENDING_ACCESS, DEGRADED, UNAVAILABLE, MOCK_ONLY
+    mode: Mapped[str] = mapped_column(String(20), default="LIVE")  # LIVE, OBSERVATION, DEMO, STALE, UNAVAILABLE
     last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_attempt_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    records_last_success: Mapped[int] = mapped_column(Integer, default=0)
+    schema_version: Mapped[str] = mapped_column(String(20), default="1.0")
+    availability_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
@@ -287,3 +294,38 @@ class AuditLog(Base):
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class FloodEvent(Base):
+    __tablename__ = "flood_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    area: Mapped[str] = mapped_column(String(100), default="KMITL & Lat Krabang")
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    peak_risk: Mapped[str] = mapped_column(String(20), default="HIGH")
+    peak_reports: Mapped[int] = mapped_column(Integer, default=0)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(100), default="HISTORICAL_ARCHIVE")
+    mode: Mapped[str] = mapped_column(String(20), default="DEMO")  # DEMO or OBSERVATION
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    snapshots: Mapped[List["EventSnapshot"]] = relationship("EventSnapshot", back_populates="event", cascade="all, delete-orphan")
+
+
+class EventSnapshot(Base):
+    __tablename__ = "event_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("flood_events.id", ondelete="CASCADE"), nullable=False)
+    snapshot_timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    rain_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    water_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    reports_data: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    incidents_data: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    risk_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    satellite_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    event: Mapped["FloodEvent"] = relationship("FloodEvent", back_populates="snapshots")

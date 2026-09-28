@@ -9,7 +9,9 @@ from app.core.redis import close_redis_client
 from app.websocket.live_hub import hub_manager
 from app.api.v1 import (
     health, situation, reports, incidents,
-    water, rain, satellite, help, shelters
+    water, rain, satellite, help, shelters,
+    data_status, routing, replay, realtime_sse,
+    metrics
 )
 
 # Configure structured logging
@@ -58,6 +60,11 @@ app.include_router(rain.router, prefix="/api/v1")
 app.include_router(satellite.router, prefix="/api/v1")
 app.include_router(help.router, prefix="/api/v1")
 app.include_router(shelters.router, prefix="/api/v1")
+app.include_router(data_status.router, prefix="/api/v1")
+app.include_router(routing.router, prefix="/api/v1")
+app.include_router(replay.router, prefix="/api/v1")
+app.include_router(realtime_sse.router, prefix="/api/v1")
+app.include_router(metrics.router, prefix="/api/v1")
 
 
 # Real-time WebSocket endpoint

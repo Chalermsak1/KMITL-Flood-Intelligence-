@@ -24,3 +24,5 @@ class SituationSummaryResponse(BaseModel):
     last_updated: datetime
     data_sources_available: int
     data_sources_total: int
+    model_version: str = "2.1.0-explainable"
+    config_version: str = "2026.09"

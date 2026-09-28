@@ -105,20 +105,47 @@ All REST endpoints follow a standardized response envelope containing `data` and
 * **`GET /api/v1/shelters`**
   * Returns evacuation shelters, medical posts, and supply stations.
 
+### 2.10 Data Source Status & Observability Registry
+* **`GET /api/v1/data-status`**
+  * Returns live health, mode (`LIVE`, `OBSERVATION`, `DEMO`, `STALE`, `UNAVAILABLE`), data age, and latency across TMD, BMA, Traffy, and Satellite adapters.
+
+### 2.11 Flood-Aware Routing (Decision Support)
+* **`POST /api/v1/routes/evaluate`**
+  * Body: `{"origin": {"lat": 13.7298, "lng": 100.7782}, "destination": {"lat": 13.7180, "lng": 100.7850}, "mode": "CAR"}`
+  * Returns: 2–3 candidate corridors ranked with label `"LOWER OBSERVED FLOOD EXPOSURE"`, distance, estimated time, and segment risk breakdown.
+
+### 2.12 Historical Event Replay
+* **`GET /api/v1/replay/events`**
+  * Lists archived flood scenarios with `mode="DEMO"`.
+* **`GET /api/v1/replay/events/{id}/timeline`**
+  * Returns chronological slices for the interactive timeline slider.
+
+### 2.13 AI Computer Vision & Human Verification
+* **`POST /api/v1/reports/verify-image`**
+  * Validates magic bytes, tests blur/luminance, computes 64-bit dHash, and returns flood detection & depth band estimate.
+* **`POST /api/v1/admin/reports/{id}/override`**
+  * Operator override (`AI_CONFIRMED`, `ADMIN_VERIFIED`, `REJECTED`) with immutable audit logging.
+
+### 2.14 Emergency SOS Triage Dispatch
+* **`PATCH /api/v1/admin/help/{id}/triage`**
+  * Transition emergency ticket status (`OPEN` -> `ACKNOWLEDGED` -> `ASSIGNED` -> `IN_PROGRESS` -> `RESOLVED` -> `CANCELLED`) with audit trail.
+
+### 2.15 Telemetry & Metrics
+* **`GET /api/v1/metrics`**
+  * Operational Prometheus/CloudWatch telemetry: API latency, active reports, active incidents, queue backlog.
+* **`GET /api/v1/ready`**
+  * Deep readiness probe verifying live connection to PostgreSQL and Redis.
+
 ---
 
-## 3. Real-Time WebSocket (`/ws/live`)
+## 3. Real-Time Streaming Channels
 
-* **URL:** `ws://<host>/ws/live`
+### 3.1 Public One-Way Server-Sent Events (SSE)
+* **URL:** `GET /api/v1/realtime/events`
 * **Query Parameters:**
-  * `bbox` (optional): Filter events to a specific viewport bounding box.
-* **Message Protocol:**
-  * Type: JSON text frame
-  * Structure:
-    ```json
-    {
-      "event": "INCIDENT_UPDATED | REPORT_CREATED | WATER_UPDATED | RAIN_UPDATED | RISK_CHANGED | HELP_REQUEST_CREATED",
-      "timestamp": "2026-09-28T11:34:00+07:00",
-      "payload": {}
-    }
-    ```
+  * `bbox` (optional): Viewport bounding box (`minLng,minLat,maxLng,maxLat`)
+* **Event Format:** Standardized SSE text/event-stream with event deduplication ID.
+
+### 3.2 Operator Bidirectional WebSocket (`/ws/live`)
+* **URL:** `ws://<host>/ws/live`
+* Dedicated to Admin, EOC operators, and emergency responders for interactive dispatch.

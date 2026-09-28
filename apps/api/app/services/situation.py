@@ -41,7 +41,29 @@ class SituationService:
         avail_stmt = select(func.count(DataSource.id)).where(DataSource.is_active == True)
         avail_sources = (await session.scalar(avail_stmt)) or 4
 
-        # 6. Compute multi-factor risk status and explanations
+        # 6. Data Coverage Check (Rule: No critical inputs -> UNKNOWN, never default LOW)
+        has_environmental_telemetry = (latest_rain is not None) or (len(water_obs) > 0)
+        has_crowd_observations = (active_incidents > 0)
+
+        if not has_environmental_telemetry and not has_crowd_observations:
+            return SituationSummaryResponse(
+                area_name="KMITL & Lat Krabang Basin",
+                current_status="UNKNOWN",
+                overall_risk_score=0.0,
+                rain_trend=rain_trend,
+                water_trend=water_trend,
+                active_incidents=active_incidents,
+                active_help_requests=active_help,
+                data_quality="INSUFFICIENT",
+                explanation=["Data coverage insufficient: No live telemetry or reports available. Status is strictly UNKNOWN."],
+                last_updated=now,
+                data_sources_available=avail_sources,
+                data_sources_total=total_sources,
+                model_version="2.1.0-explainable",
+                config_version="2026.09"
+            )
+
+        # 7. Compute multi-factor explainable risk status
         risk_score = 0.0
         explanations: List[str] = []
 
@@ -93,5 +115,7 @@ class SituationService:
             explanation=explanations,
             last_updated=now,
             data_sources_available=avail_sources,
-            data_sources_total=total_sources
+            data_sources_total=total_sources,
+            model_version="2.1.0-explainable",
+            config_version="2026.09"
         )

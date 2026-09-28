@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AlertCircle, Activity, Map, FileWarning, LifeBuoy, ShieldCheck, Home } from "lucide-react";
+import { AlertCircle, Activity, Map, FileWarning, LifeBuoy, ShieldCheck, Home, Navigation, History } from "lucide-react";
 import clsx from "clsx";
 
 interface HeaderProps {
@@ -16,7 +16,9 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true }) => {
   const navItems = [
     { label: "Situation", href: "/", icon: Home },
     { label: "Live Map", href: "/map", icon: Map },
+    { label: "Route", href: "/route", icon: Navigation },
     { label: "Report Flood", href: "/report", icon: FileWarning },
+    { label: "Replay", href: "/replay", icon: History },
     { label: "Request SOS", href: "/help", icon: LifeBuoy, highlight: true },
     { label: "Admin EOC", href: "/admin", icon: ShieldCheck }
   ];

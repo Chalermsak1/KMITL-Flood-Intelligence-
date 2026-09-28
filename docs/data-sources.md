@@ -78,7 +78,7 @@
 ### 2.4 Copernicus Sentinel-1 SAR & NASA OPERA DSWx-S1
 * **Official Documentation:** [documentation.dataspace.copernicus.eu](https://documentation.dataspace.copernicus.eu/)
 * **Catalog & Endpoints:**
-  * STAC API: `https://catalogue.dataspace.copernicus.eu/stac`
+  * STAC API (Current CDSE v1): `https://stac.dataspace.copernicus.eu/v1/search`
   * OData API: `https://catalogue.dataspace.copernicus.eu/odata/v1/Products`
   * Authentication: OAuth2 Keycloak at `identity.dataspace.copernicus.eu`
 * **Data Class:** **Observational Evidence Layer** (ไม่ใช่ Real-time รายนาที)

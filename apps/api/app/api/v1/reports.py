@@ -1,7 +1,8 @@
+import io
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException, status, BackgroundTasks, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from geoalchemy2.functions import ST_X, ST_Y, ST_MakeEnvelope, ST_Intersects
@@ -173,3 +174,111 @@ async def create_flood_report(
     )
 
     return StandardResponse(data=resp_data, meta=meta)
+
+
+@router.post("/reports/verify-image")
+async def verify_report_image(
+    file: UploadFile = File(...),
+    latitude: Optional[float] = Query(None),
+    longitude: Optional[float] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    from PIL import Image
+    from app.services.image_verifier import ImageVerificationService
+    from app.models.entities import FloodReport
+
+    data = await file.read()
+    is_valid_type, mime_or_err = ImageVerificationService.validate_magic_bytes(data)
+    if not is_valid_type:
+        raise HTTPException(status_code=400, detail=mime_or_err)
+
+    try:
+        img = Image.open(io.BytesIO(data))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Cannot decode image. Corrupted file.")
+
+    # Assess quality
+    quality = ImageVerificationService.assess_image_quality(img)
+
+    # Compute pHash
+    phash = ImageVerificationService.compute_perceptual_hash(img)
+
+    # Check duplicate against existing reports within 500m in past 2h
+    is_duplicate = False
+    now = datetime.now(timezone.utc)
+    recent_reports = await db.execute(
+        select(FloodReport.image_hash).where(
+            FloodReport.observed_at >= now - timedelta(hours=2),
+            FloodReport.image_hash != None
+        ).limit(50)
+    )
+    for (existing_hash,) in recent_reports.all():
+        if existing_hash and ImageVerificationService.hamming_distance(phash, existing_hash) <= 5:
+            is_duplicate = True
+            break
+
+    # Run flood classification
+    classification = ImageVerificationService.classify_flood_image(img)
+
+    # Synthesize confidence
+    overall_conf = ImageVerificationService.calculate_overall_confidence(
+        recency_minutes=0,
+        nearby_reports_count=1,
+        has_photo=True,
+        image_quality_status=quality["status"],
+        ai_confidence=classification["confidence"],
+        is_duplicate=is_duplicate
+    )
+
+    return {
+        "status": "success",
+        "mime_type": mime_or_err,
+        "quality": quality,
+        "perceptual_hash": phash,
+        "is_duplicate": is_duplicate,
+        "classification": classification,
+        "recommended_confidence": overall_conf
+    }
+
+
+@router.post("/admin/reports/{report_id}/override")
+async def admin_override_report(
+    report_id: uuid.UUID,
+    action: str = Query(..., description="AI_CONFIRMED, ADMIN_VERIFIED, REJECTED"),
+    admin_id: str = Query("ADMIN_EOC_1"),
+    reason: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db)
+):
+    from app.models.entities import FloodReport, AuditLog
+
+    report = (await db.execute(select(FloodReport).where(FloodReport.id == report_id))).scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Flood report not found")
+
+    old_status = report.verification_status
+    report.verification_status = action
+    if action == "REJECTED":
+        report.confidence = ConfidenceLevel.LOW
+    elif action in ["ADMIN_VERIFIED", "AI_CONFIRMED"]:
+        report.confidence = ConfidenceLevel.HIGH
+
+    # Write audit log
+    audit = AuditLog(
+        actor_id=admin_id,
+        action="REPORT_VERIFICATION_OVERRIDE",
+        target_table="flood_reports",
+        target_id=report.id,
+        old_value={"verification_status": old_status},
+        new_value={"verification_status": action},
+        reason=reason or "Admin manual triage review"
+    )
+    db.add(audit)
+    await db.commit()
+
+    return {
+        "report_id": str(report.id),
+        "status": "OVERRIDDEN",
+        "new_verification_status": action,
+        "confidence": report.confidence.value
+    }
+

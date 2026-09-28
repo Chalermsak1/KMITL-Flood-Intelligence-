@@ -8,7 +8,7 @@ from app.core.config import settings
 class SatelliteAdapter(DataSourceAdapter):
     def __init__(self):
         super().__init__(source_id="SRC_COPERNICUS_S1", name="Copernicus Sentinel-1 SAR / OPERA DSWx-S1")
-        self.stac_endpoint = "https://catalogue.dataspace.copernicus.eu/stac/search"
+        self.stac_endpoint = "https://stac.dataspace.copernicus.eu/v1/search"
 
     async def fetch(self) -> List[Any]:
         # If Copernicus OAuth2 credentials provided, can query STAC API for Sentinel-1 GRD

@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from geoalchemy2.functions import ST_X, ST_Y
 
+from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.redis import publish_event
-from app.models.entities import HelpRequest
+from app.models.entities import HelpRequest, AuditLog
 from app.models.enums import HelpStatus, HelpPriority, HelpType
 from app.schemas.common import StandardResponse, MetaEnvelope
 from app.schemas.help import HelpRequestCreate, HelpRequestResponse
@@ -141,3 +142,54 @@ async def list_help_requests(db: AsyncSession = Depends(get_db)):
     )
 
     return StandardResponse(data=items, meta=meta)
+
+
+class HelpTriageRequest(BaseModel):
+    status: HelpStatus
+    assigned_to: Optional[str] = None
+    notes: Optional[str] = None
+    actor_id: str = "EOC_OPERATOR_01"
+
+
+@router.patch("/admin/help/{help_id}/triage")
+async def triage_help_request(
+    help_id: uuid.UUID,
+    payload: HelpTriageRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(HelpRequest).where(HelpRequest.id == help_id)
+    help_req = (await db.execute(stmt)).scalar_one_or_none()
+    if not help_req:
+        raise HTTPException(status_code=404, detail="Help request not found")
+
+    old_status = help_req.status.value
+    help_req.status = payload.status
+    if payload.assigned_to:
+        help_req.assigned_to = payload.assigned_to
+
+    # Log to AuditLog
+    audit = AuditLog(
+        actor_id=payload.actor_id,
+        action="UPDATE_STATUS",
+        target_table="help_requests",
+        target_id=help_id,
+        old_value={"status": old_status},
+        new_value={"status": payload.status.value, "assigned_to": payload.assigned_to},
+        reason=payload.notes or f"Status updated to {payload.status.value}"
+    )
+    db.add(audit)
+    await db.commit()
+
+    # Emit real-time event
+    now = datetime.now(timezone.utc)
+    await publish_event("HELP_STATUS_CHANGED", {
+        "help_id": str(help_id),
+        "ticket_number": help_req.ticket_number,
+        "old_status": old_status,
+        "new_status": payload.status.value,
+        "assigned_to": payload.assigned_to,
+        "timestamp": now.isoformat()
+    })
+
+    return {"status": "SUCCESS", "message": f"Help request #{help_req.ticket_number} transitioned to {payload.status.value}"}
+
