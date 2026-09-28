@@ -14,7 +14,7 @@ from app.core.config import settings
 logger = logging.getLogger("api.realtime_sse")
 router = APIRouter(tags=["Public Realtime Events (SSE)"])
 
-REDIS_CHANNEL = "kmitl:events"
+REDIS_CHANNEL = "flood:events"
 
 
 def is_in_bbox(lat: Optional[float], lng: Optional[float], bbox_str: Optional[str]) -> bool:

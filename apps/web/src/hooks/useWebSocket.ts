@@ -13,31 +13,35 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const [transportMode, setTransportMode] = useState<"WEBSOCKET" | "SSE" | "POLLING">("POLLING");
   const [lastEvent, setLastEvent] = useState<WebSocketEvent | null>(null);
 
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const wsRef = useRef<WebSocket | null>(null);
   const sseRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const unmountedRef = useRef(false);
 
   const handleIncomingEvent = useCallback((event: WebSocketEvent) => {
     setLastEvent(event);
-    if (options.onEvent) {
-      options.onEvent(event);
+    if (optionsRef.current.onEvent) {
+      optionsRef.current.onEvent(event);
     }
-  }, [options]);
+  }, []);
 
-  const clearFallbacks = () => {
+  const clearFallbacks = useCallback(() => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-  };
+  }, []);
 
   const startPollingFallback = useCallback(() => {
+    if (unmountedRef.current) return;
     setTransportMode("POLLING");
     if (!pollingIntervalRef.current) {
-      const intervalMs = options.pollingIntervalMs || 20000;
+      const intervalMs = optionsRef.current.pollingIntervalMs || 20000;
       pollingIntervalRef.current = setInterval(() => {
-        // Fallback HTTP poll: emit synthetic event to refresh data
         handleIncomingEvent({
           event: "REPORT_CREATED",
           timestamp: new Date().toISOString(),
@@ -45,9 +49,10 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         });
       }, intervalMs);
     }
-  }, [options.pollingIntervalMs, handleIncomingEvent]);
+  }, [handleIncomingEvent]);
 
   const connectSSE = useCallback(() => {
+    if (unmountedRef.current) return;
     if (typeof window === "undefined" || typeof EventSource === "undefined") {
       startPollingFallback();
       return;
@@ -55,8 +60,13 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
     try {
+      if (sseRef.current) {
+        sseRef.current.close();
+      }
+
       const sse = new EventSource(`${apiBase}/api/v1/realtime/events`);
       sse.onopen = () => {
+        if (unmountedRef.current) { sse.close(); return; }
         setIsConnected(true);
         setTransportMode("SSE");
         clearFallbacks();
@@ -78,24 +88,31 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       sse.onerror = () => {
         sse.close();
         sseRef.current = null;
-        setIsConnected(false);
-        startPollingFallback();
+        if (!unmountedRef.current) {
+          setIsConnected(false);
+          startPollingFallback();
+        }
       };
 
       sseRef.current = sse;
     } catch {
       startPollingFallback();
     }
-  }, [startPollingFallback, handleIncomingEvent]);
+  }, [startPollingFallback, clearFallbacks, handleIncomingEvent]);
 
   const connect = useCallback(() => {
-    if (typeof window === "undefined") return;
+    if (unmountedRef.current || typeof window === "undefined") return;
 
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8001/ws/live";
     try {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
+        if (unmountedRef.current) { ws.close(); return; }
         setIsConnected(true);
         setTransportMode("WEBSOCKET");
         clearFallbacks();
@@ -103,12 +120,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           sseRef.current.close();
           sseRef.current = null;
         }
-        // Emit resync on reconnect
-        handleIncomingEvent({
-          event: "REPORT_CREATED",
-          timestamp: new Date().toISOString(),
-          payload: { resync: true }
-        });
       };
 
       ws.onmessage = (event) => {
@@ -116,15 +127,17 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           const parsed: WebSocketEvent = JSON.parse(event.data);
           handleIncomingEvent(parsed);
         } catch {
-          // Ignore non-json frames (e.g. pong)
+          // Ignore non-json frames
         }
       };
 
       ws.onclose = () => {
+        if (unmountedRef.current) return;
         setIsConnected(false);
         // Try SSE fallback first
         connectSSE();
-        // Schedule WebSocket reconnect
+        // Schedule WebSocket reconnect with safe 5s backoff
+        if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, 5000);
@@ -139,15 +152,24 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       setIsConnected(false);
       connectSSE();
     }
-  }, [connectSSE, handleIncomingEvent]);
+  }, [connectSSE, clearFallbacks, handleIncomingEvent]);
 
   useEffect(() => {
+    unmountedRef.current = false;
     connect();
+
     return () => {
+      unmountedRef.current = true;
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-      if (wsRef.current) wsRef.current.close();
-      if (sseRef.current) sseRef.current.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
     };
   }, [connect]);
 

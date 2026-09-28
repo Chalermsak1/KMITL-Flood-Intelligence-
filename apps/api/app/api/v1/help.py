@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from geoalchemy2.functions import ST_X, ST_Y
 
 from pydantic import BaseModel
@@ -95,7 +95,11 @@ async def submit_help_request(request_in: HelpRequestCreate, db: AsyncSession = 
     if request_in.help_type in [HelpType.TRAPPED, HelpType.EVACUATION] or request_in.vulnerable_details:
         priority = HelpPriority.CRITICAL
 
+    # Generate sequential ticket number
+    ticket_num = (await db.execute(select(func.nextval("help_requests_ticket_seq")))).scalar() or 1001
+
     new_help = HelpRequest(
+        ticket_number=ticket_num,
         requester_name=request_in.requester_name or "Anonymous Citizen",
         contact_phone=request_in.contact_phone,
         location=f"SRID=4326;POINT({request_in.longitude} {request_in.latitude})",

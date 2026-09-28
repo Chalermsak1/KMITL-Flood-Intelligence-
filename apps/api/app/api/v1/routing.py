@@ -25,6 +25,7 @@ class RouteEvaluateRequest(BaseModel):
 
 
 @router.post("/routes/evaluate")
+@router.post("/routing/evaluate")
 async def evaluate_flood_routes(
     payload: RouteEvaluateRequest,
     db: AsyncSession = Depends(get_db)

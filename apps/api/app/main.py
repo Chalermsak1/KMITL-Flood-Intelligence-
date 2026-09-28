@@ -47,43 +47,63 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Request, Response
-
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+class SecurityHeadersMiddleware:
     """
-    Production Security Headers:
+    Pure ASGI Production Security Headers:
     - X-Content-Type-Options: nosniff
     - X-Frame-Options: DENY (clickjacking protection)
     - Referrer-Policy: strict-origin-when-cross-origin
     - Content-Security-Policy: restrict dangerous scripts
     - Strict-Transport-Security: HSTS when in production
     - Body size guard: rejects oversized requests (>10MB) with 413
+    Avoids Starlette BaseHTTPMiddleware memory-channel deadlocks on SSE/WebSockets.
     """
     MAX_BODY_BYTES = 10 * 1024 * 1024  # 10MB limit
 
-    async def dispatch(self, request: Request, call_next):
-        content_length = request.headers.get("content-length")
-        if content_length:
-            try:
-                if int(content_length) > self.MAX_BODY_BYTES:
-                    return Response(
-                        content='{"detail":"Payload Too Large: request body exceeds 10MB limit."}',
-                        status_code=413,
-                        media_type="application/json"
-                    )
-            except ValueError:
-                pass
+    def __init__(self, app):
+        self.app = app
 
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self' 'unsafe-inline';"
-        if settings.ENVIRONMENT.lower() == "production":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        return response
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Check content-length header
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"content-length":
+                try:
+                    if int(value.decode("latin1")) > self.MAX_BODY_BYTES:
+                        body = b'{"detail":"Payload Too Large: request body exceeds 10MB limit."}'
+                        await send({
+                            "type": "http.response.start",
+                            "status": 413,
+                            "headers": [
+                                (b"content-type", b"application/json"),
+                                (b"content-length", str(len(body)).encode("latin1")),
+                            ],
+                        })
+                        await send({
+                            "type": "http.response.body",
+                            "body": body,
+                        })
+                        return
+                except ValueError:
+                    pass
+                break
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                headers.append((b"x-content-type-options", b"nosniff"))
+                headers.append((b"x-frame-options", b"DENY"))
+                headers.append((b"referrer-policy", b"strict-origin-when-cross-origin"))
+                headers.append((b"content-security-policy", b"default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self' 'unsafe-inline';"))
+                if settings.ENVIRONMENT.lower() == "production":
+                    headers.append((b"strict-transport-security", b"max-age=31536000; includeSubDomains"))
+                message["headers"] = headers
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
 
 
 # Mount Middlewares

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy import (
     Column, String, Integer, Float, Boolean, Text, DateTime,
-    ForeignKey, BigInteger, Enum as SQLEnum, Index
+    ForeignKey, BigInteger, Enum as SQLEnum, Index, Sequence, text
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -70,7 +70,9 @@ class Incident(Base):
     __tablename__ = "incidents"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    incident_number: Mapped[int] = mapped_column(Integer, autoincrement=True, unique=True)
+    incident_number: Mapped[int] = mapped_column(
+        Integer, Sequence("incidents_incident_number_seq"), server_default=text("nextval('incidents_incident_number_seq')"), unique=True
+    )
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     boundary = mapped_column(Geometry(geometry_type="POLYGON", srid=4326), nullable=True)
     centroid = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
@@ -242,7 +244,9 @@ class HelpRequest(Base):
     __tablename__ = "help_requests"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    ticket_number: Mapped[int] = mapped_column(Integer, autoincrement=True, unique=True)
+    ticket_number: Mapped[int] = mapped_column(
+        Integer, Sequence("help_requests_ticket_seq"), server_default=text("nextval('help_requests_ticket_seq')"), unique=True
+    )
     requester_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     location = mapped_column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
