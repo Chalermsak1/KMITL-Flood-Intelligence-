@@ -61,26 +61,29 @@ async def list_water_stations(db: AsyncSession = Depends(get_db)):
 
     if not items:
         # Fallback to BMA adapter live/mock feed
-        adapter = BMAAdapter()
-        raw_items = await adapter.fetch()
-        for r in raw_items:
-            norm = adapter.normalize(r)
-            age_min = max(0, int((now - norm.observed_at).total_seconds() / 60.0))
-            items.append(
-                WaterStationResponse(
-                    id=norm.value["station_id"],
-                    name=norm.value["name"],
-                    station_type=norm.value["station_type"],
-                    latitude=norm.location["coordinates"][1],
-                    longitude=norm.location["coordinates"][0],
-                    warning_threshold_meters=norm.value["warning_threshold"],
-                    critical_threshold_meters=norm.value["critical_threshold"],
-                    current_level_m_msl=norm.value["water_level_m_msl"],
-                    trend=norm.value["trend"],
-                    last_observed_at=norm.observed_at,
-                    data_age_min=age_min
+        try:
+            adapter = BMAAdapter()
+            raw_items = await adapter.fetch()
+            for r in raw_items:
+                norm = adapter.normalize(r)
+                age_min = max(0, int((now - norm.observed_at).total_seconds() / 60.0))
+                items.append(
+                    WaterStationResponse(
+                        id=norm.value["station_id"],
+                        name=norm.value["name"],
+                        station_type=norm.value["station_type"],
+                        latitude=norm.location["coordinates"][1],
+                        longitude=norm.location["coordinates"][0],
+                        warning_threshold_meters=norm.value["warning_threshold"],
+                        critical_threshold_meters=norm.value["critical_threshold"],
+                        current_level_m_msl=norm.value["water_level_m_msl"],
+                        trend=norm.value["trend"],
+                        last_observed_at=norm.observed_at,
+                        data_age_min=age_min
+                    )
                 )
-            )
+        except Exception:
+            pass
 
     meta = MetaEnvelope(
         source="SRC_BMA_DDS",

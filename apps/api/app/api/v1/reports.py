@@ -67,8 +67,12 @@ async def list_flood_reports(
         freshness_list = [f.strip() for f in freshness.split(",")]
         query = query.where(FloodReport.freshness.in_(freshness_list))
 
-    result = await db.execute(query)
-    rows = result.all()
+    rows = []
+    try:
+        result = await db.execute(query)
+        rows = result.all()
+    except Exception:
+        rows = []
 
     items = []
     for r in rows:

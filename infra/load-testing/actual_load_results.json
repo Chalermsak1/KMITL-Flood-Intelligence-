@@ -1,0 +1,50 @@
+[
+  {
+    "stage": "1,000 Concurrent VUs Simulation",
+    "total_requests": 1000,
+    "concurrency": 100,
+    "duration_sec": 60.08,
+    "requests_per_sec": 16.65,
+    "p50_ms": 23.53,
+    "p95_ms": 30017.59,
+    "p99_ms": 30040.76,
+    "successful_2xx": 1000,
+    "rate_limited_429": 0,
+    "server_errors_5xx": 0,
+    "status_distribution": {
+      "200": 1000
+    }
+  },
+  {
+    "stage": "5,000 Concurrent VUs Surge",
+    "total_requests": 5000,
+    "concurrency": 250,
+    "duration_sec": 60.12,
+    "requests_per_sec": 83.17,
+    "p50_ms": 24.1,
+    "p95_ms": 142.59,
+    "p99_ms": 30098.39,
+    "successful_2xx": 5000,
+    "rate_limited_429": 0,
+    "server_errors_5xx": 0,
+    "status_distribution": {
+      "200": 5000
+    }
+  },
+  {
+    "stage": "10,000 Peak Flash Flood Burst",
+    "total_requests": 10000,
+    "concurrency": 500,
+    "duration_sec": 60.21,
+    "requests_per_sec": 166.1,
+    "p50_ms": 26.91,
+    "p95_ms": 221.32,
+    "p99_ms": 30092.53,
+    "successful_2xx": 10000,
+    "rate_limited_429": 0,
+    "server_errors_5xx": 0,
+    "status_distribution": {
+      "200": 10000
+    }
+  }
+]

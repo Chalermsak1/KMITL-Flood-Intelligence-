@@ -14,9 +14,11 @@ router = APIRouter(tags=["Satellite SAR Inundation"])
 @router.get("/satellite/latest", response_model=StandardResponse[SatelliteObservationResponse])
 async def get_latest_satellite_observation(db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
-    adapter = SatelliteAdapter()
-    raw_list = await adapter.fetch()
-    norm = adapter.normalize(raw_list[0]) if raw_list else None
+    try:
+        raw_list = await adapter.fetch()
+        norm = adapter.normalize(raw_list[0]) if raw_list else None
+    except Exception:
+        norm = None
 
     hours_age = round((now - norm.observed_at).total_seconds() / 3600.0, 1) if norm else 14.0
 

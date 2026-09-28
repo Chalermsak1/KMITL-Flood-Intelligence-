@@ -107,7 +107,8 @@ class PrivacyGuard:
         """Strip EXIF metadata from uploaded photos to prevent GPS/device leakage."""
         try:
             image = Image.open(io.BytesIO(image_bytes))
-            data = list(image.getdata())
+            get_data_fn = getattr(image, "get_flattened_data", None) or image.getdata
+            data = list(get_data_fn())
             clean_image = Image.new(image.mode, image.size)
             clean_image.putdata(data)
             output = io.BytesIO()

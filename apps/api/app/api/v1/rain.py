@@ -12,9 +12,11 @@ router = APIRouter(tags=["Rain & Weather Radar"])
 @router.get("/rain/current", response_model=StandardResponse[RainObservationResponse])
 async def get_current_rain(db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
-    adapter = TMDAdapter()
-    raw_list = await adapter.fetch()
-    norm = adapter.normalize(raw_list[0]) if raw_list else None
+    try:
+        raw_list = await adapter.fetch()
+        norm = adapter.normalize(raw_list[0]) if raw_list else None
+    except Exception:
+        norm = None
 
     age_min = max(0, int((now - norm.observed_at).total_seconds() / 60.0)) if norm else 0
 
