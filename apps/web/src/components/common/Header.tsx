@@ -18,7 +18,9 @@ import {
   Database,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  Sun,
+  Moon
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -38,6 +40,25 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof document !== "undefined") {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const willBeDark = !isDark;
+    setIsDark(willBeDark);
+    if (willBeDark) {
+      document.documentElement.classList.add("dark");
+      try { localStorage.setItem("kmitl_theme", "dark"); } catch {}
+    } else {
+      document.documentElement.classList.remove("dark");
+      try { localStorage.setItem("kmitl_theme", "light"); } catch {}
+    }
+  };
 
   const mainNavItems: NavItem[] = [
     { label: "Situation", href: "/", icon: Home },
@@ -177,6 +198,26 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
               {isWsConnected ? (transportMode ? `${transportMode} LIVE` : "LIVE STREAM") : "HTTP POLLING"}
             </span>
           </div>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card border border-surface-border text-xs font-medium hover:opacity-80 transition-all shadow-sm"
+            title={isDark ? "สลับเป็นโหมดสว่าง (Light Mode)" : "สลับเป็นโหมดมืด (Dark Mode)"}
+            aria-label="Toggle Light/Dark Theme"
+          >
+            {isDark ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline text-gray-200 text-[11px]">โหมดสว่าง</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-blue-600" />
+                <span className="hidden sm:inline text-gray-700 text-[11px]">โหมดมืด</span>
+              </>
+            )}
+          </button>
 
           <Link
             href="/help"

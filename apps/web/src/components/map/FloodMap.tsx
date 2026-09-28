@@ -57,8 +57,8 @@ export const FloodMap: React.FC<FloodMapProps> = ({
     if (!mapContainer.current || mapRef.current) return;
 
     const styleUrl = highContrast
-      ? "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
-      : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+      ? "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+      : "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
     const map = new maplibregl.Map({
       container: mapContainer.current,
@@ -199,7 +199,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
             <div class="relative w-8 h-8 rounded-full bg-orange-600 border-2 border-white shadow-xl flex items-center justify-center text-white font-black text-xs">
               ${inc.report_count}
             </div>
-            <div class="absolute -bottom-5 bg-surface-card border border-surface-border text-[10px] font-mono px-1.5 py-0.2 rounded text-orange-300 whitespace-nowrap shadow-md">
+            <div class="absolute -bottom-5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded text-orange-600 dark:text-orange-400 whitespace-nowrap shadow-md">
               ${inc.consensus_depth_band.replace("DEPTH_", "").replace("_", " ")}
             </div>
           </div>
@@ -246,7 +246,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
             <div class="w-7 h-7 rounded-lg bg-cyan-600 border border-cyan-300 shadow-lg flex items-center justify-center text-white text-xs font-bold">
               🌊
             </div>
-            <div class="mt-0.5 bg-surface-card border border-cyan-500/30 text-[9px] font-mono px-1 rounded text-cyan-300 whitespace-nowrap">
+            <div class="mt-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-cyan-500/30 text-[9px] font-mono font-bold px-1 rounded text-cyan-700 dark:text-cyan-300 whitespace-nowrap shadow-sm">
               ${stn.current_level_m_msl?.toFixed(2) || "0.80"}m
             </div>
           </div>
@@ -286,7 +286,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
             <div class="w-7 h-7 rounded-full bg-emerald-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-xs">
               🏥
             </div>
-            <div class="mt-0.5 bg-surface-card border border-emerald-500/30 text-[9px] font-mono px-1 rounded text-emerald-300 whitespace-nowrap">
+            <div class="mt-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-emerald-500/30 text-[9px] font-mono font-bold px-1 rounded text-emerald-700 dark:text-emerald-300 whitespace-nowrap shadow-sm">
               ${sh.name.substring(0, 16)}...
             </div>
           </div>
@@ -331,7 +331,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
             <div class="w-6 h-6 rounded-full ${depthColor} border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold">
               💧
             </div>
-            <div class="mt-0.5 bg-surface-card border border-surface-border text-[9px] font-mono px-1 rounded text-gray-200 whitespace-nowrap shadow">
+            <div class="mt-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-700 text-[9px] font-mono font-bold px-1 rounded text-slate-800 dark:text-gray-200 whitespace-nowrap shadow-sm">
               ${rep.water_depth_band?.replace("DEPTH_", "").replace(/_/g, " ") || "น้ำท่วม"}
             </div>
           </div>

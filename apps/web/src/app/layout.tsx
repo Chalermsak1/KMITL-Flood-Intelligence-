@@ -19,8 +19,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="th" className="dark">
-      <body className="min-h-screen flex flex-col bg-background text-gray-100 antialiased selection:bg-primary-500 selection:text-white">
+    <html lang="th">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (localStorage.getItem('kmitl_theme') === 'dark') {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
+      <body className="min-h-screen flex flex-col bg-background text-gray-900 dark:text-gray-100 antialiased selection:bg-primary-500 selection:text-white">
         <Header />
         <main className="flex-1 flex flex-col">{children}</main>
       </body>
