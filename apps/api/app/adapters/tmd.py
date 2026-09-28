@@ -82,8 +82,8 @@ class TMDAdapter(DataSourceAdapter):
         if not (settings.TMD_UID and settings.TMD_UKEY):
             return HealthCheckResult(
                 source_id=self.source_id,
-                status="DEGRADED",
-                message="No TMD UID/UKEY configured; using validated MockProvider (mode: DEMO)",
+                status="PENDING_ACCESS",
+                message="Official TMD UID/UKEY access pending; using validated fallback (mode: DEMO)",
                 mode="DEMO"
             )
         start = time.perf_counter()

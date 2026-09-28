@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-09-28T06:09:00.945750+00:00",
+  "environment": "macOS aarch64 Python 3.14 Asyncio Event Loop",
+  "benchmark_profile": "Staging SSE Connection Scale Test (In-Memory Async Subscriber Queues)",
+  "results": {
+    "tier_1000": {
+      "target_connections": 1000,
+      "active_connections_achieved": 1000,
+      "connection_success_rate": 100.0,
+      "connection_setup_time_sec": 0.001,
+      "connection_setup_rate_conn_per_sec": 1315285.9,
+      "memory_before_mb": 59.02,
+      "memory_connected_mb": 62.7,
+      "memory_delta_mb": 3.69,
+      "bytes_per_active_connection": 3866.6,
+      "fanout_total_ms": 0.48,
+      "fanout_delivered_count": 700,
+      "fanout_skipped_out_of_bounds": 300,
+      "event_loss_rate": 0.0,
+      "duplicate_event_rate": 0.0,
+      "fanout_latency_per_client_us": {
+        "p50_us": 0.46,
+        "p95_us": 0.54,
+        "p99_us": 0.79,
+        "max_us": 7.62
+      },
+      "disconnect_throughput_conn_per_sec": 8040200.0
+    },
+    "tier_5000": {
+      "target_connections": 5000,
+      "active_connections_achieved": 5000,
+      "connection_success_rate": 100.0,
+      "connection_setup_time_sec": 0.016,
+      "connection_setup_rate_conn_per_sec": 311133.9,
+      "memory_before_mb": 62.77,
+      "memory_connected_mb": 77.67,
+      "memory_delta_mb": 14.91,
+      "bytes_per_active_connection": 3126.1,
+      "fanout_total_ms": 6.73,
+      "fanout_delivered_count": 3500,
+      "fanout_skipped_out_of_bounds": 1500,
+      "event_loss_rate": 0.0,
+      "duplicate_event_rate": 0.0,
+      "fanout_latency_per_client_us": {
+        "p50_us": 1.25,
+        "p95_us": 2.58,
+        "p99_us": 3.79,
+        "max_us": 133.96
+      },
+      "disconnect_throughput_conn_per_sec": 3083724.3
+    },
+    "tier_10000": {
+      "target_connections": 10000,
+      "active_connections_achieved": 10000,
+      "connection_success_rate": 100.0,
+      "connection_setup_time_sec": 0.022,
+      "connection_setup_rate_conn_per_sec": 460890.6,
+      "memory_before_mb": 77.75,
+      "memory_connected_mb": 96.28,
+      "memory_delta_mb": 18.53,
+      "bytes_per_active_connection": 1943.1,
+      "fanout_total_ms": 11.36,
+      "fanout_delivered_count": 7000,
+      "fanout_skipped_out_of_bounds": 3000,
+      "event_loss_rate": 0.0,
+      "duplicate_event_rate": 0.0,
+      "fanout_latency_per_client_us": {
+        "p50_us": 1.08,
+        "p95_us": 2.17,
+        "p99_us": 3.0,
+        "max_us": 19.33
+      },
+      "disconnect_throughput_conn_per_sec": 2618886.3
+    }
+  }
+}

@@ -18,9 +18,39 @@ export default function ReportPage() {
   const [description, setDescription] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submittedReport, setSubmittedReport] = useState<any>(null);
+  const [pendingOffline, setPendingOffline] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  // Request browser geolocation on mount
+  // Request browser geolocation and manage network status
   useEffect(() => {
+    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+    const handleOnline = async () => {
+      setIsOnline(true);
+      const saved = localStorage.getItem("kmitl_pending_report");
+      if (saved) {
+        try {
+          const payload = JSON.parse(saved);
+          setSubmitting(true);
+          const res = await api.postReport(payload);
+          localStorage.removeItem("kmitl_pending_report");
+          setPendingOffline(null);
+          setSubmittedReport(res.data);
+        } catch (e) {
+          console.error("Retry submission failed:", e);
+        } finally {
+          setSubmitting(false);
+        }
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -36,23 +66,42 @@ export default function ReportPage() {
     } else {
       setGpsStatus("Browser does not support Geolocation.");
     }
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    const payload = {
+      latitude: lat,
+      longitude: lng,
+      water_depth_band: waterDepth,
+      vehicle_passability: passability,
+      transport_type: transportType,
+      description: description || undefined
+    };
+
+    // If offline or disconnected, queue report as PENDING
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      localStorage.setItem("kmitl_pending_report", JSON.stringify(payload));
+      setPendingOffline(payload);
+      setSubmitting(false);
+      return;
+    }
+
     try {
-      const res = await api.postReport({
-        latitude: lat,
-        longitude: lng,
-        water_depth_band: waterDepth,
-        vehicle_passability: passability,
-        transport_type: transportType,
-        description: description || undefined
-      });
+      const res = await api.postReport(payload);
+      localStorage.removeItem("kmitl_pending_report");
+      setPendingOffline(null);
       setSubmittedReport(res.data);
     } catch (err) {
-      alert("Submission error: Please try again.");
+      // Network failure during submit: queue as PENDING
+      localStorage.setItem("kmitl_pending_report", JSON.stringify(payload));
+      setPendingOffline(payload);
     } finally {
       setSubmitting(false);
     }
@@ -69,7 +118,67 @@ export default function ReportPage() {
       </Link>
 
       <div className="bg-surface-card border border-surface-border rounded-2xl p-6 sm:p-8 shadow-xl">
-        {!submittedReport ? (
+        {!isOnline && (
+          <div className="mb-6 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-xs text-amber-300 font-mono">
+            <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+            <span>NETWORK OFFLINE: Reports submitted now will be stored locally as <strong>PENDING</strong> and submitted automatically upon reconnection.</span>
+          </div>
+        )}
+
+        {pendingOffline ? (
+          /* OFFLINE PENDING SCREEN */
+          <div className="text-center py-8 space-y-4">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-black text-amber-400">REPORT STATUS: PENDING</h2>
+            <div className="inline-block px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-mono font-bold">
+              QUEUED FOR RETRY (OFFLINE)
+            </div>
+            <p className="text-xs text-gray-300 max-w-md mx-auto">
+              รายงานของคุณถูกบันทึกไว้ในอุปกรณ์เรียบร้อยแล้ว (สถานะ PENDING) ยังไม่ถูกส่งขึ้นเซิร์ฟเวอร์เนื่องจากเครือข่ายออฟไลน์ ระบบจะทำการส่งรายงานอัตโนมัติทันทีเมื่อเชื่อมต่ออินเทอร์เน็ตสำเร็จ.
+            </p>
+
+            <div className="bg-surface p-4 rounded-xl border border-surface-border text-xs text-left max-w-sm mx-auto space-y-1.5 font-mono">
+              <div><b>Location:</b> {pendingOffline.latitude.toFixed(4)}, {pendingOffline.longitude.toFixed(4)}</div>
+              <div><b>Depth Band:</b> {pendingOffline.water_depth_band}</div>
+              <div><b>Local Queue Status:</b> WAITING FOR NETWORK ACK</div>
+            </div>
+
+            <div className="pt-4 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  setSubmitting(true);
+                  try {
+                    const res = await api.postReport(pendingOffline);
+                    localStorage.removeItem("kmitl_pending_report");
+                    setPendingOffline(null);
+                    setSubmittedReport(res.data);
+                  } catch (e) {
+                    alert("Network still unreachable. Keeping report in PENDING queue.");
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                disabled={submitting}
+                className="py-2.5 px-5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs"
+              >
+                {submitting ? "RETRYING..." : "RETRY SUBMISSION NOW"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem("kmitl_pending_report");
+                  setPendingOffline(null);
+                }}
+                className="py-2.5 px-5 rounded-xl bg-surface border border-surface-border text-gray-300 hover:text-white font-bold text-xs"
+              >
+                DISCARD QUEUE
+              </button>
+            </div>
+          </div>
+        ) : !submittedReport ? (
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-white">

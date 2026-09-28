@@ -36,6 +36,19 @@ class Settings(BaseSettings):
     DEFAULT_CENTER_LNG: float = 100.7782
     DEFAULT_ZOOM: int = 14
 
+    # Feature Flags
+    FEATURE_FLAG_TMD: bool = True
+    FEATURE_FLAG_BMA: bool = True
+    FEATURE_FLAG_TRAFFY: bool = True
+    FEATURE_FLAG_SATELLITE: bool = True
+    FEATURE_FLAG_AI_VERIFICATION: bool = True
+    FEATURE_FLAG_ROUTING: bool = True
+    FEATURE_FLAG_SOS: bool = True
+    FEATURE_FLAG_REALTIME: bool = True
+
+    # Operational Control Mode: NORMAL, ELEVATED, EMERGENCY
+    OPERATIONAL_MODE: str = "NORMAL"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

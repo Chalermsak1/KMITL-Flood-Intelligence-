@@ -1,0 +1,26 @@
+{
+  "dataset_size_records": 100000,
+  "indexing_throughput_records_sec": 953720.3,
+  "viewport_bbox_1000_queries": {
+    "latency": {
+      "p50_ms": 0.54,
+      "p95_ms": 0.77,
+      "p99_ms": 0.94,
+      "max_ms": 1.95,
+      "min_ms": 0.35
+    },
+    "avg_matches_per_query": 5751.3,
+    "throughput_queries_sec": 1766.1
+  },
+  "dwithin_500m_1000_queries": {
+    "latency": {
+      "p50_ms": 0.23,
+      "p95_ms": 0.68,
+      "p99_ms": 1.2,
+      "max_ms": 4.35,
+      "min_ms": 0.14
+    },
+    "avg_matches_per_query": 427.8,
+    "throughput_queries_sec": 3595.8
+  }
+}

@@ -6,18 +6,33 @@ from app.core.security import PrivacyGuard
 
 def test_exif_stripping_protects_citizen_gps():
     """
-    Privacy Validation: EXIF metadata must be stripped.
+    Privacy Validation: EXIF metadata must be stripped at the byte level.
+    Ensures that photos taken on citizen phones have all device and GPS tags wiped.
     """
     from PIL import Image
     import io
     
     img = Image.new("RGB", (100, 100), color="blue")
+    exif = img.getexif()
+    exif[0x0112] = 1        # Orientation tag
+    exif[0x010f] = "Apple"  # Device make tag
+    exif[0x0131] = "iOS 18.1 Camera GPS Location Service" # Software tag
+    
     buf = io.BytesIO()
-    img.save(buf, format="JPEG")
+    img.save(buf, format="JPEG", exif=exif)
     raw_bytes = buf.getvalue()
     
+    # Verify original has tags
+    img_before = Image.open(io.BytesIO(raw_bytes))
+    assert len(img_before.getexif().keys()) > 0
+    
+    # Strip EXIF
     cleaned = PrivacyGuard.strip_exif(raw_bytes)
     assert len(cleaned) > 0
+    
+    # Verify stripped bytes have ZERO tags
+    img_after = Image.open(io.BytesIO(cleaned))
+    assert len(img_after.getexif().keys()) == 0
 
 
 def test_public_coordinate_sanitization():

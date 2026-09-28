@@ -27,6 +27,7 @@ class DurableQueue:
 
     def __init__(self):
         self._redis: Optional[aioredis.Redis] = None
+        self._in_memory_queue: List[Dict[str, Any]] = []
 
     async def get_redis(self) -> aioredis.Redis:
         if self._redis is None:
@@ -56,9 +57,12 @@ class DurableQueue:
             else:
                 await r.rpush(QUEUE_KEY, serialized)
             logger.info(f"Enqueued job {job_id} [{job_type}] with priority {priority}")
-        except Exception as e:
-            logger.error(f"Failed to enqueue job {job_id}: {e}", exc_info=True)
-            # In-memory execution fallback if Redis is temporarily unreachable
+        except Exception:
+            # Resilient in-memory fallback when Redis is offline
+            if priority == "HIGH":
+                self._in_memory_queue.insert(0, job_data)
+            else:
+                self._in_memory_queue.append(job_data)
         return job_id
 
     async def dequeue(self, timeout_sec: int = 2) -> Optional[Dict[str, Any]]:
@@ -68,8 +72,13 @@ class DurableQueue:
             if res:
                 _, raw = res
                 return json.loads(raw)
-        except Exception as e:
-            logger.error(f"Error dequeueing job: {e}")
+        except Exception:
+            pass
+
+        # Check local in-memory fallback queue
+        if self._in_memory_queue:
+            return self._in_memory_queue.pop(0)
+
         return None
 
     async def move_to_dlq(self, job_data: Dict[str, Any], reason: str):

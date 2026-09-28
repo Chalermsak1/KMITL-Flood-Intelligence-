@@ -59,8 +59,8 @@ class TraffyAdapter(DataSourceAdapter):
     async def health_check(self) -> HealthCheckResult:
         return HealthCheckResult(
             source_id=self.source_id,
-            status="AVAILABLE",
+            status="PENDING_ACCESS",
             latency_ms=10,
-            message="Mock Provider active (mode: DEMO - official API token pending)",
+            message="Traffy Fondue live tickets require NECTEC OAuth2 token (mode: DEMO / HISTORICAL)",
             mode="DEMO"
         )

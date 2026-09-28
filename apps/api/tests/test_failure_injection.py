@@ -67,9 +67,12 @@ async def test_failure_injection_redis_unavailable():
         # Graceful return with fallback job ID
         assert job_id is not None
 
-        # Dequeue should return None rather than crashing
+        # Dequeue handles Redis failure gracefully without crashing
         res = await dq.dequeue(timeout_sec=1)
-        assert res is None
+        assert res is None or res.get("job_id") == job_id
+        # When queue is drained, returns None
+        empty_res = await dq.dequeue(timeout_sec=1)
+        assert empty_res is None
 
 
 @pytest.mark.asyncio

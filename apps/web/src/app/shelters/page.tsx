@@ -218,7 +218,7 @@ export default function SheltersPage() {
                       <div className="flex items-center justify-between text-xs font-mono">
                         <span className="text-gray-400 flex items-center gap-1">
                           <Users className="w-3.5 h-3.5" />
-                          <span>Occupancy</span>
+                          <span>Occupancy <span className="text-[10px] text-amber-400 font-sans font-normal">(Operator Log)</span></span>
                         </span>
                         <span className="text-white font-bold">
                           {point.current_occupancy} / {point.capacity} ({occupancyRatio}%)
@@ -236,8 +236,15 @@ export default function SheltersPage() {
                           style={{ width: `${occupancyRatio}%` }}
                         />
                       </div>
+                      <div className="text-[10px] font-mono text-gray-400">
+                        Status: <em>OCCUPANCY NOT VERIFIED VIA SENSORS (Manual EOC Log)</em>
+                      </div>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="text-[11px] font-mono text-gray-400 bg-surface/40 px-3 py-2 rounded-xl border border-surface-border/40">
+                      Occupancy: <strong>NOT VERIFIED</strong> (Contact station)
+                    </div>
+                  )}
 
                   {/* METADATA */}
                   <div className="text-xs text-gray-400 space-y-1.5 pt-1">

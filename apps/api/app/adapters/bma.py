@@ -95,8 +95,8 @@ class BMAAdapter(DataSourceAdapter):
     async def health_check(self) -> HealthCheckResult:
         return HealthCheckResult(
             source_id=self.source_id,
-            status="AVAILABLE",
+            status="PENDING_ACCESS",
             latency_ms=15,
-            message="Mock Provider active (mode: DEMO - official DDS API pending agreement)",
+            message="BMA DDS canal sensors pending official production token (mode: DEMO)",
             mode="DEMO"
         )

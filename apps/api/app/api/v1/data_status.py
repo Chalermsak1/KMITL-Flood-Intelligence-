@@ -27,4 +27,5 @@ async def get_data_sources_status(db: AsyncSession = Depends(get_db)):
         mode="LIVE"
     )
 
-    return StandardResponse(data={"sources": sources}, meta=meta)
+    governance = DataSourceHealthService.get_governance_status()
+    return StandardResponse(data={"sources": sources, "governance": governance}, meta=meta)

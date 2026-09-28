@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
 from app.models.entities import DataSource
 from app.adapters import TMDAdapter, BMAAdapter, TraffyAdapter, SatelliteAdapter
 
@@ -22,13 +23,13 @@ class DataSourceHealthService:
                 "source_id": "SRC_TMD_WEATHER",
                 "name": "TMD",
                 "full_name": "Thai Meteorological Department",
-                "status": "LIVE",
-                "mode": "LIVE",
+                "status": "PENDING_ACCESS",
+                "mode": "DEMO",
                 "last_updated": datetime.now(timezone.utc).isoformat(),
                 "data_age_seconds": 120,
                 "latency_ms": 320,
                 "error_rate": 0.0,
-                "notes": "TMD Open Weather API & KMITL Weather Station",
+                "notes": "Official TMD API access pending credentials. Using validated local fallback.",
                 "is_satellite_observational": False
             },
             {
@@ -112,3 +113,20 @@ class DataSourceHealthService:
             })
 
         return results
+
+    @classmethod
+    def get_governance_status(cls) -> Dict[str, Any]:
+        """Returns active operational mode and feature flags for emergency control."""
+        return {
+            "operational_mode": settings.OPERATIONAL_MODE,
+            "feature_flags": {
+                "tmd_adapter": settings.FEATURE_FLAG_TMD,
+                "bma_adapter": settings.FEATURE_FLAG_BMA,
+                "traffy_adapter": settings.FEATURE_FLAG_TRAFFY,
+                "satellite_adapter": settings.FEATURE_FLAG_SATELLITE,
+                "ai_image_verification": settings.FEATURE_FLAG_AI_VERIFICATION,
+                "routing_service": settings.FEATURE_FLAG_ROUTING,
+                "sos_dispatch": settings.FEATURE_FLAG_SOS,
+                "realtime_sse": settings.FEATURE_FLAG_REALTIME,
+            }
+        }
