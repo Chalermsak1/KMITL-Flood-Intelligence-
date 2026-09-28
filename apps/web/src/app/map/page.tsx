@@ -38,8 +38,8 @@ function detectLowBandwidth(): boolean {
 }
 
 // ─── Satellite Age Label ──────────────────────────────────────────────────────
-function SatelliteAgeLabel({ satellite }: { satellite: SatelliteObservation | null }) {
-  if (!satellite) return null;
+function SatelliteAgeLabel({ satellite, mounted }: { satellite: SatelliteObservation | null; mounted?: boolean }) {
+  if (!satellite || !mounted) return null;
   const acqTime = satellite.acquisition_at ? new Date(satellite.acquisition_at) : null;
   const ageMs = acqTime ? Date.now() - acqTime.getTime() : null;
   const ageHours = ageMs ? Math.round(ageMs / 3600000) : null;
@@ -77,6 +77,7 @@ export default function MapPage() {
   const [satelliteLoading, setSatelliteLoading] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [mounted, setMounted] = useState(false);
 
   // P1-01: Low-bandwidth mode
   const [isLowBandwidth, setIsLowBandwidth] = useState(false);
@@ -84,8 +85,9 @@ export default function MapPage() {
   // P2-01: High-contrast mode for outdoor daylight
   const [highContrast, setHighContrast] = useState(false);
 
-  // Detect low bandwidth on mount
+  // Detect low bandwidth and set mounted on mount
   useEffect(() => {
+    setMounted(true);
     const detected = detectLowBandwidth();
     setIsLowBandwidth(detected);
     if (detected) setShowLowBwBanner(true);
@@ -192,7 +194,7 @@ export default function MapPage() {
       <div className="absolute top-4 right-14 z-20 flex flex-col items-end gap-2">
         {/* Satellite acquisition age — never implies live road data */}
         {satellite && satelliteLoaded && layers.satellite && (
-          <SatelliteAgeLabel satellite={satellite} />
+          <SatelliteAgeLabel satellite={satellite} mounted={mounted} />
         )}
         {/* Satellite loading indicator */}
         {satelliteLoading && (
@@ -212,7 +214,7 @@ export default function MapPage() {
         {/* Telemetry badge */}
         <div className="hidden sm:flex items-center gap-2 bg-surface/90 backdrop-blur-md border border-surface-border px-3 py-1.5 rounded-xl shadow-lg text-xs font-mono text-gray-300">
           <Clock className="w-3.5 h-3.5 text-primary-400" />
-          <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
+          <span>Updated: {mounted ? lastUpdated.toLocaleTimeString() : "--:--:--"}</span>
           <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${isConnected ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
             {isConnected ? transportMode : "POLLING"}

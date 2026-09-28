@@ -1,3 +1,5 @@
+@import "maplibre-gl/dist/maplibre-gl.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,7 +16,27 @@ body {
   overflow-x: hidden;
 }
 
-/* MapLibre Popup Dark Styling Override */
+/* MapLibre Container Sizing & Popup Dark Styling Override */
+.maplibregl-map {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+}
+
+.maplibregl-canvas-container,
+.maplibregl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.maplibregl-marker {
+  z-index: 10 !important;
+}
+
+.maplibregl-popup {
+  z-index: 20 !important;
+}
+
 .maplibregl-popup-content {
   background: #111827 !important;
   border: 1px solid #243247 !important;

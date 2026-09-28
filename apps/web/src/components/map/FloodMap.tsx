@@ -56,40 +56,21 @@ export const FloodMap: React.FC<FloodMapProps> = ({
 
     if (!mapContainer.current || mapRef.current) return;
 
-    const tileStyleUrl = highContrast
-      ? "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"
-      : "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png";
+    const styleUrl = highContrast
+      ? "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json"
+      : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
     const map = new maplibregl.Map({
       container: mapContainer.current,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: "raster",
-            tiles: [
-              tileStyleUrl,
-              "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-              "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"
-            ],
-            tileSize: 256,
-            attribution: "&copy; OpenStreetMap contributors &copy; CARTO"
-          }
-        },
-        layers: [
-          {
-            id: "osm-tiles",
-            type: "raster",
-            source: "osm",
-            minzoom: 0,
-            maxzoom: 19
-          }
-        ]
-      },
+      style: styleUrl,
       center: [defaultLng, defaultLat],
       zoom: 14,
       pitch: 0,
       attributionControl: false
+    });
+
+    map.on("error", (e) => {
+      console.warn("MapLibre event error:", e);
     });
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
@@ -98,6 +79,8 @@ export const FloodMap: React.FC<FloodMapProps> = ({
     map.on("load", () => {
       setIsMapLoaded(true);
       map.resize();
+      setTimeout(() => map.resize(), 100);
+      setTimeout(() => map.resize(), 500);
       // Add Satellite SAR Water Polygons GeoJSON source
       map.addSource("satellite-water", {
         type: "geojson",
@@ -403,8 +386,12 @@ export const FloodMap: React.FC<FloodMapProps> = ({
   }
 
   return (
-    <div className={`relative w-full h-full min-h-[500px] ${className || ""}`}>
-      <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+    <div className={`absolute inset-0 w-full h-full ${className || ""}`}>
+      <div
+        ref={mapContainer}
+        className="w-full h-full"
+        style={{ width: "100%", height: "100%" }}
+      />
     </div>
   );
 };

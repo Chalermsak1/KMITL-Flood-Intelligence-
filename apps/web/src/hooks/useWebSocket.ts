@@ -106,13 +106,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8001/ws/live";
     try {
       if (wsRef.current) {
-        wsRef.current.close();
+        const oldWs = wsRef.current;
+        wsRef.current = null;
+        oldWs.onmessage = null;
+        oldWs.onerror = null;
+        oldWs.onclose = null;
+        if (oldWs.readyState === WebSocket.OPEN) {
+          try { oldWs.close(1000, "Reconnecting"); } catch {}
+        }
       }
 
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        if (unmountedRef.current) { ws.close(); return; }
+        if (unmountedRef.current) {
+          try { ws.close(1000, "Component unmounted"); } catch {}
+          return;
+        }
         setIsConnected(true);
         setTransportMode("WEBSOCKET");
         clearFallbacks();
@@ -144,7 +154,14 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       };
 
       ws.onerror = () => {
-        ws.close();
+        if (unmountedRef.current) return;
+        try {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
+        } catch {
+          // ignore
+        }
       };
 
       wsRef.current = ws;
@@ -163,8 +180,18 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
       if (wsRef.current) {
-        wsRef.current.close();
+        const socket = wsRef.current;
         wsRef.current = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        if (socket.readyState === WebSocket.CONNECTING) {
+          socket.onopen = () => {
+            try { socket.close(1000, "Component unmounted"); } catch {}
+          };
+        } else if (socket.readyState === WebSocket.OPEN) {
+          try { socket.close(1000, "Component unmounted"); } catch {}
+        }
       }
       if (sseRef.current) {
         sseRef.current.close();
