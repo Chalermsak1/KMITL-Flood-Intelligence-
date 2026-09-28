@@ -22,7 +22,7 @@ https://staging.flood.kmitl.ac.th (Staging HTTPS Reverse-Proxy Endpoint)
 [Note: AWS commercial production URL https://flood.kmitl.ac.th provisioned in Terraform and awaiting sponsor budget sign-off]
 
 Actual Commit:
-d02fa14fb87ff91aa8edb65764bd3cacb6063b37
+7e2923fb6c982199c78bb197b759b38a741f40c1
 
 Core User Journey:
 PASS

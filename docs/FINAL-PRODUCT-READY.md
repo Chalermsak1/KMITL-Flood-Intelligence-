@@ -11,7 +11,7 @@ Environment:
 Limited Public Beta / Multi-Container Production Topology (Campus Network & Staging)
 
 Commit:
-d02fa14fb87ff91aa8edb65764bd3cacb6063b37
+7e2923fb6c982199c78bb197b759b38a741f40c1
 
 Deployment:
 Docker Compose Multi-Container Stack (Web: Next.js 14 on :3000, API: FastAPI on :8000, Database: PostgreSQL 16 + PostGIS 3.4 on :5432, Cache/PubSub: Redis 7.2 on :6379, Worker: AsyncQueueWorker + WorkerManager)
