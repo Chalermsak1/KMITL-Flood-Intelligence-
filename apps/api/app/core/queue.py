@@ -176,6 +176,41 @@ class DurableQueue:
         except Exception as e:
             logger.error(f"Failed to move job to DLQ: {e}")
 
+    async def get_stats(self) -> Dict[str, Any]:
+        """Return multi-tier queue telemetry and operational health."""
+        redis_depth = 0
+        redis_dlq = 0
+        redis_ok = False
+        try:
+            r = await self.get_redis()
+            redis_depth = await r.llen(QUEUE_KEY)
+            redis_dlq = await r.llen(QUEUE_DLQ)
+            redis_ok = True
+        except Exception:
+            redis_ok = False
+
+        sqs_configured = bool(getattr(settings, "SQS_QUEUE_URL", ""))
+
+        return {
+            "tier1_sqs": {
+                "configured": sqs_configured,
+                "queue_url": getattr(settings, "SQS_QUEUE_URL", None),
+                "dlq_url": getattr(settings, "SQS_DLQ_URL", None)
+            },
+            "tier2_redis": {
+                "available": redis_ok,
+                "pending_depth": redis_depth,
+                "dlq_depth": redis_dlq
+            },
+            "tier3_disk_spool": {
+                "path": self._spool_file,
+                "pending_count": len(self._in_memory_queue)
+            },
+            "idempotent_keys_cached": len(getattr(self, "_processed_keys", set())),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
 
 # Global queue singleton
 job_queue = DurableQueue()
+

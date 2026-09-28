@@ -129,7 +129,7 @@ export default function MapPage() {
     }
   }, [loadCoreData]);
 
-  const { isConnected } = useWebSocket({ onEvent: handleWsEvent });
+  const { isConnected, transportMode } = useWebSocket({ onEvent: handleWsEvent });
 
   useEffect(() => {
     loadCoreData();
@@ -200,6 +200,10 @@ export default function MapPage() {
         <div className="hidden sm:flex items-center gap-2 bg-surface/90 backdrop-blur-md border border-surface-border px-3 py-1.5 rounded-xl shadow-lg text-xs font-mono text-gray-300">
           <Clock className="w-3.5 h-3.5 text-primary-400" />
           <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${isConnected ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-amber-500/20 text-amber-400 border border-amber-500/30"}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+            {isConnected ? transportMode : "POLLING"}
+          </span>
           <button
             onClick={loadCoreData}
             className="p-1 hover:bg-surface-card rounded text-gray-400 hover:text-white transition-colors"

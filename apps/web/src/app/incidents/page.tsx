@@ -161,6 +161,15 @@ export default function IncidentsPage() {
                       <Users className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                       <span>{inc.report_count} corroborating citizen reports</span>
                     </div>
+
+                    <div className="flex items-center gap-2 pt-1 font-mono text-[10px]">
+                      <span className="px-2 py-0.5 rounded bg-surface border border-surface-border text-orange-300">
+                        Depth: {inc.consensus_depth_band.replace("BELOW_", "< ").replace("_TO_", "–").replace("ABOVE_", "> ")}
+                      </span>
+                      <span className="px-2 py-0.5 rounded bg-surface border border-surface-border text-gray-300">
+                        {inc.consensus_passability}
+                      </span>
+                    </div>
                   </div>
                 </div>
 

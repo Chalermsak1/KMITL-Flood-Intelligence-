@@ -24,6 +24,7 @@ import clsx from "clsx";
 
 interface HeaderProps {
   isWsConnected?: boolean;
+  transportMode?: "WEBSOCKET" | "SSE" | "POLLING";
 }
 
 interface NavItem {
@@ -33,7 +34,7 @@ interface NavItem {
   highlight?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isWsConnected = true }) => {
+export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportMode }) => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
@@ -51,7 +52,8 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true }) => {
     { label: "Analytics & Trends", href: "/analytics", icon: BarChart3 },
     { label: "Data Provenance", href: "/data", icon: Database },
     { label: "Event Replay", href: "/replay", icon: History },
-    { label: "Admin EOC", href: "/admin", icon: ShieldCheck }
+    { label: "Admin EOC", href: "/admin", icon: ShieldCheck },
+    { label: "Limitations & Safety", href: "/limitations", icon: AlertCircle }
   ];
 
   const allMobileNavItems: NavItem[] = [
@@ -62,10 +64,10 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true }) => {
 
   return (
     <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md border-b border-surface-border">
-      {/* Demo Warning Banner */}
-      <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1 text-center text-xs text-amber-300 font-mono flex items-center justify-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-amber-400" />
-        <span>DEMO MODE ACTIVE: Sensor & radar inputs use validated scenario models. User reports are LIVE.</span>
+      {/* Beta Status Banner */}
+      <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-1 text-center text-xs text-blue-300 font-mono flex items-center justify-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <span>LIMITED BETA: Citizen reports are LIVE. Copernicus is OBSERVATION. Agency feeds (TMD/BMA/Traffy) are PENDING_ACCESS.</span>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -168,11 +170,11 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true }) => {
             <span
               className={clsx(
                 "w-2 h-2 rounded-full",
-                isWsConnected ? "bg-emerald-400 animate-pulse" : "bg-red-400"
+                isWsConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400 animate-pulse"
               )}
             />
             <span className="text-gray-300 hidden sm:inline text-[11px]">
-              {isWsConnected ? "LIVE STREAM" : "RECONNECTING"}
+              {isWsConnected ? (transportMode ? `${transportMode} LIVE` : "LIVE STREAM") : "HTTP POLLING"}
             </span>
           </div>
 

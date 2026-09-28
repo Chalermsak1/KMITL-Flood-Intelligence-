@@ -8,20 +8,26 @@ from sqlalchemy import select, and_
 from geoalchemy2.functions import ST_X, ST_Y, ST_MakeEnvelope, ST_Intersects
 
 from app.core.database import get_db, AsyncSessionLocal
+from app.core.config import settings
 from app.core.redis import publish_event
+from app.core.security import rate_limit
 from app.models.entities import FloodReport
 from app.models.enums import ReportFreshness, ConfidenceLevel
 from app.schemas.common import StandardResponse, MetaEnvelope
 from app.schemas.report import FloodReportCreate, FloodReportResponse
 from app.services.clustering import SpatioTemporalClusteringService
+from app.services.geofence import classify_coverage, coverage_warning_message
 
 router = APIRouter(tags=["Flood Reports"])
 
 
 async def run_clustering_background():
-    async with AsyncSessionLocal() as session:
-        service = SpatioTemporalClusteringService()
-        await service.cluster_active_reports(session)
+    try:
+        async with AsyncSessionLocal() as session:
+            service = SpatioTemporalClusteringService()
+            await service.cluster_active_reports(session)
+    except Exception:
+        pass
 
 
 @router.get("/reports", response_model=StandardResponse[List[FloodReportResponse]])
@@ -77,6 +83,7 @@ async def list_flood_reports(
     items = []
     for r in rows:
         age_min = max(0, int((now - r.observed_at).total_seconds() / 60.0))
+        zone = classify_coverage(r.latitude, r.longitude)
         items.append(
             FloodReportResponse(
                 id=r.id,
@@ -92,7 +99,8 @@ async def list_flood_reports(
                 freshness=r.freshness,
                 observed_at=r.observed_at,
                 data_age_min=age_min,
-                incident_id=r.incident_id
+                incident_id=r.incident_id,
+                coverage_zone=zone
             )
         )
 
@@ -113,12 +121,18 @@ async def list_flood_reports(
 async def create_flood_report(
     report_in: FloodReportCreate,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: bool = Depends(rate_limit(max_requests=10, window_seconds=60))
 ):
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(hours=2)
 
+    coverage_zone = classify_coverage(report_in.latitude, report_in.longitude)
+    cov_warning = coverage_warning_message(coverage_zone)
+    warnings = [cov_warning] if cov_warning else None
+
     new_report = FloodReport(
+        id=uuid.uuid4(),
         location=f"SRID=4326;POINT({report_in.longitude} {report_in.latitude})",
         water_depth_band=report_in.water_depth_band,
         vehicle_passability=report_in.vehicle_passability,
@@ -144,8 +158,31 @@ async def create_flood_report(
         "water_depth_band": report_in.water_depth_band.value,
         "vehicle_passability": report_in.vehicle_passability.value,
         "transport_type": report_in.transport_type.value,
+        "coverage_zone": coverage_zone,
         "timestamp": now.isoformat()
     })
+
+    # Enqueue job to Multi-Tier Durable Queue (Tier 1: SQS, Tier 2: Redis, Tier 3: Disk WAL)
+    try:
+        from app.core.queue import job_queue
+        await job_queue.enqueue(
+            "CLUSTER_INCIDENTS",
+            {
+                "report_id": str(new_report.id),
+                "latitude": report_in.latitude,
+                "longitude": report_in.longitude,
+                "water_depth_band": report_in.water_depth_band.value
+            },
+            priority="HIGH"
+        )
+        if report_in.photo_url:
+            await job_queue.enqueue(
+                "PROCESS_REPORT_IMAGE",
+                {"report_id": str(new_report.id), "photo_url": report_in.photo_url},
+                priority="NORMAL"
+            )
+    except Exception as q_err:
+        pass
 
     # Trigger background spatio-temporal incident clustering
     background_tasks.add_task(run_clustering_background)
@@ -164,7 +201,8 @@ async def create_flood_report(
         freshness=new_report.freshness,
         observed_at=new_report.observed_at,
         data_age_min=0,
-        incident_id=None
+        incident_id=None,
+        coverage_zone=coverage_zone
     )
 
     meta = MetaEnvelope(
@@ -177,7 +215,7 @@ async def create_flood_report(
         mode="LIVE"
     )
 
-    return StandardResponse(data=resp_data, meta=meta)
+    return StandardResponse(data=resp_data, meta=meta, warnings=warnings)
 
 
 @router.post("/reports/verify-image")
@@ -185,7 +223,8 @@ async def verify_report_image(
     file: UploadFile = File(...),
     latitude: Optional[float] = Query(None),
     longitude: Optional[float] = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _limiter: bool = Depends(rate_limit(max_requests=15, window_seconds=60))
 ):
     from PIL import Image
     from app.services.image_verifier import ImageVerificationService

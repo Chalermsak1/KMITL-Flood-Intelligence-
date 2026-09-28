@@ -36,7 +36,9 @@ def test_data_health_service_summary():
     health = DataSourceHealthService.get_static_sources()
     assert len(health) >= 4
     for h in health:
-        assert h["name"] in ["TMD", "BMA", "TRAFFY", "SATELLITE"]
+        assert h["name"] in ["TMD", "BMA", "TRAFFY", "SATELLITE", "CROWD"]
         assert h["status"] is not None
         assert h["mode"] is not None
+        assert "credential_status" in h
+        assert "live_ingestion_enabled" in h
         assert isinstance(h["error_rate"], float)

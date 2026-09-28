@@ -329,3 +329,29 @@ class EventSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     event: Mapped["FloodEvent"] = relationship("FloodEvent", back_populates="snapshots")
+
+
+class SourceActivationRecord(Base):
+    """
+    Phase 30 Section 29: Live Data Onboarding Authoritative Audit Trail.
+    Enforces the strict progression: PENDING_ACCESS -> CONNECTED -> VALIDATED -> LIVE
+    """
+    __tablename__ = "source_activation_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    requested_by: Mapped[str] = mapped_column(String(100), nullable=False)
+    approved_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="PENDING_ACCESS")  # PENDING_ACCESS, CONNECTED, VALIDATED, LIVE
+    credential_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    health_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_success: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    first_persisted_observation: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    activated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    rollback_flag: Mapped[str] = mapped_column(String(50), default="FEATURE_FLAG_TMD_LIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    def __init__(self, **kwargs):
+        if "id" not in kwargs or kwargs["id"] is None:
+            kwargs["id"] = uuid.uuid4()
+        super().__init__(**kwargs)

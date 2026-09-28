@@ -14,7 +14,8 @@ import {
   Clock,
   ArrowRight,
   Info,
-  TrendingUp
+  TrendingUp,
+  Navigation
 } from "lucide-react";
 import { api } from "../lib/api";
 import { SituationSummary, Incident, MetaEnvelope } from "../lib/types";
@@ -81,7 +82,7 @@ export default function HomePage() {
             )}
             <div className="text-gray-400 text-[11px] flex items-center gap-1">
               <Clock className="w-3 h-3 text-gray-500" />
-              <span>Fused: TMD Radar + BMA Telemetry + Crowd Reports</span>
+              <span>Fused: Citizen Reports (LIVE) + Copernicus SAR (OBSERVATION)</span>
             </div>
           </div>
         </div>
@@ -94,10 +95,10 @@ export default function HomePage() {
               <span>Rainfall Activity</span>
             </div>
             <div className="text-lg font-bold text-white uppercase">
-              {summary?.rain_trend || "MODERATE"}
+              {summary?.rain_trend || "MONITORING"}
             </div>
             <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-              TMD Station ~18.2 mm/hr
+              TMD Feed: PENDING_ACCESS
             </div>
           </div>
 
@@ -106,12 +107,11 @@ export default function HomePage() {
               <Droplets className="w-4 h-4 text-cyan-400" />
               <span>Canal Water Stage</span>
             </div>
-            <div className="text-lg font-bold text-amber-400 flex items-center gap-1.5 uppercase">
-              {summary?.water_trend || "RISING"}
-              <TrendingUp className="w-4 h-4" />
+            <div className="text-lg font-bold text-cyan-400 flex items-center gap-1.5 uppercase">
+              {summary?.water_trend || "MONITORING"}
             </div>
             <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-              Prawet lock: 0.88m MSL
+              BMA Feed: PENDING_ACCESS
             </div>
           </div>
 
@@ -121,7 +121,7 @@ export default function HomePage() {
               <span>Active Incidents</span>
             </div>
             <div className="text-lg font-bold text-orange-400">
-              {summary?.active_incidents ?? 8} Clusters
+              {summary?.active_incidents ?? recentIncidents.length} Clusters
             </div>
             <div className="text-[11px] text-gray-400 font-mono mt-0.5">
               Corroborated by reports
@@ -131,13 +131,13 @@ export default function HomePage() {
           <div className="bg-surface/60 border border-surface-border/60 rounded-xl p-4">
             <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
               <LifeBuoy className="w-4 h-4 text-red-400" />
-              <span>Emergency SOS</span>
+              <span>Emergency Help</span>
             </div>
             <div className="text-lg font-bold text-red-400">
-              {summary?.active_help_requests ?? 2} Pending
+              PILOT_TEST
             </div>
-            <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-              EOC triage dispatched
+            <div className="text-[11px] text-amber-400 font-mono mt-0.5">
+              Emergency: Call 199 / 1669
             </div>
           </div>
         </div>
@@ -161,29 +161,37 @@ export default function HomePage() {
         )}
 
         {/* PRIMARY CALL TO ACTION BUTTONS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 mt-4 border-t border-surface-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-6 mt-4 border-t border-surface-border">
           <Link
             href="/map"
-            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-sm shadow-lg shadow-primary-600/30 transition-all hover:scale-[1.02]"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs shadow-lg shadow-primary-600/30 transition-all hover:scale-[1.02]"
           >
             <MapIcon className="w-4 h-4" />
-            <span>VIEW LIVE FLOOD MAP</span>
+            <span>LIVE FLOOD MAP</span>
           </Link>
 
           <Link
             href="/report"
-            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-surface-card hover:bg-surface-border border border-surface-border text-white font-bold text-sm transition-all hover:scale-[1.02]"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 text-orange-300 font-bold text-xs transition-all hover:scale-[1.02]"
           >
             <FileWarning className="w-4 h-4 text-orange-400" />
-            <span>REPORT FLOOD INCIDENT</span>
+            <span>REPORT FLOOD</span>
+          </Link>
+
+          <Link
+            href="/route"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-surface-card hover:bg-surface-border border border-surface-border text-white font-bold text-xs transition-all hover:scale-[1.02]"
+          >
+            <Navigation className="w-4 h-4 text-primary-400" />
+            <span>EVALUATE ROUTE</span>
           </Link>
 
           <Link
             href="/help"
-            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 font-bold text-sm transition-all hover:scale-[1.02]"
+            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 font-bold text-xs transition-all hover:scale-[1.02]"
           >
             <LifeBuoy className="w-4 h-4 text-red-400" />
-            <span>REQUEST EMERGENCY HELP</span>
+            <span>REQUEST HELP (SOS)</span>
           </Link>
         </div>
       </section>

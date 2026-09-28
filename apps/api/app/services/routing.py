@@ -1,6 +1,6 @@
 import math
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from shapely.geometry import LineString, Point
 
@@ -230,16 +230,36 @@ class RoutingService:
                     if not merged_coords or merged_coords[-1] != coord:
                         merged_coords.append(coord)
 
+            unknown_segs = [s["id"] for s in segs if s["flood_exposure"] == "UNKNOWN"]
+            now_iso = datetime.now(timezone.utc).isoformat()
+            cutoff_iso = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+
+            # Rule: Never claims 'Safe' or 'Flood-Free'
+            if overall_exposure in ["LOW", "MEDIUM"]:
+                label = "LOWER OBSERVED FLOOD EXPOSURE"
+                conf = "MEDIUM" if evidence_count > 0 else "LOW"
+            elif overall_exposure == "UNKNOWN":
+                label = "INSUFFICIENT DATA — UNVERIFIED SEGMENTS"
+                conf = "UNKNOWN"
+            else:
+                label = "HIGH FLOOD EXPOSURE OBSERVED"
+                conf = "HIGH" if evidence_count >= 2 else "MEDIUM"
+
             routes_data.append({
                 "route_id": str(uuid.uuid4()),
                 "name": title,
-                "recommendation_label": "LOWER OBSERVED FLOOD EXPOSURE" if overall_exposure in ["LOW", "MEDIUM"] else "HIGH FLOOD EXPOSURE OBSERVED",
+                "recommendation_label": label,
                 "distance_km": round(total_dist, 1),
                 "estimated_travel_minutes": est_time,
                 "flood_exposure": overall_exposure,
+                "confidence": conf,
                 "evidence_count": evidence_count,
                 "latest_observation_age_min": latest_age,
-                "disclaimer": "Conditions can change rapidly during monsoon downpours. Drive with caution.",
+                "generated_at": now_iso,
+                "data_cutoff": cutoff_iso,
+                "sources_used": ["SRC_USER_REPORT", "SRC_INCIDENT_CLUSTER", "OSM_LAT_KRABANG_NETWORK"],
+                "unknown_segments": unknown_segs,
+                "disclaimer": "Conditions can change rapidly during monsoon downpours. Never drive through deep or moving flood water.",
                 "geometry": {
                     "type": "LineString",
                     "coordinates": merged_coords

@@ -59,6 +59,14 @@ class SituationService:
                 last_updated=now,
                 data_sources_available=avail_sources,
                 data_sources_total=total_sources,
+                confidence="UNKNOWN",
+                sources_used=[],
+                data_cutoff=recent_window,
+                unknown_factors=[
+                    "No active citizen flood reports within past 2 hours",
+                    "No real-time TMD radar or rain gauge stream connected",
+                    "No BMA canal water level sensor stream connected"
+                ],
                 model_version="2.1.0-explainable",
                 config_version="2026.09"
             )
@@ -102,6 +110,15 @@ class SituationService:
             explanations.append("สถานการณ์ทั่วไปปกติ การระบายน้ำอยู่ในเกณฑ์เฝ้าระวัง")
 
         data_quality = "HIGH" if avail_sources >= 3 else "MEDIUM"
+        active_sources = []
+        if active_incidents > 0:
+            active_sources.append("SRC_USER_REPORT")
+        if latest_rain is not None:
+            active_sources.append("SRC_TMD_WEATHER")
+        if len(water_obs) > 0:
+            active_sources.append("SRC_BMA_WATER")
+
+        confidence = "HIGH" if len(active_sources) >= 2 else "MEDIUM"
 
         return SituationSummaryResponse(
             area_name="KMITL & Lat Krabang Basin",
@@ -116,6 +133,10 @@ class SituationService:
             last_updated=now,
             data_sources_available=avail_sources,
             data_sources_total=total_sources,
+            confidence=confidence,
+            sources_used=active_sources,
+            data_cutoff=recent_window,
+            unknown_factors=[] if len(active_sources) >= 3 else ["External API telemetry in DEMO simulation mode pending live credentials"],
             model_version="2.1.0-explainable",
             config_version="2026.09"
         )

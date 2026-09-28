@@ -119,40 +119,52 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {(dataSources.length > 0 ? dataSources : [
             {
-              source_id: "SRC_TMD_WEATHER",
-              name: "TMD",
-              full_name: "Thai Meteorological Department",
+              source_id: "SRC_USER_REPORT",
+              name: "CITIZEN REPORTS",
+              full_name: "KMITL First-Party Mobile Reports",
               status: "LIVE",
               mode: "LIVE" as const,
               last_updated: new Date().toISOString(),
-              data_age_seconds: 120,
-              latency_ms: 18,
+              data_age_seconds: 45,
+              latency_ms: 12,
               error_rate: 0.0,
-              notes: "TMD Open Weather API & KMITL Station"
+              notes: "Direct citizen mobile reporting with 100m spatial fuzzing"
+            },
+            {
+              source_id: "SRC_TMD_WEATHER",
+              name: "TMD",
+              full_name: "Thai Meteorological Department",
+              status: "PENDING_ACCESS",
+              mode: "UNAVAILABLE" as const,
+              last_updated: null,
+              data_age_seconds: null,
+              latency_ms: 0,
+              error_rate: 0.0,
+              notes: "TMD production credentials pending authorization"
             },
             {
               source_id: "SRC_BMA_DDS",
               name: "BMA",
               full_name: "BMA Dept of Drainage and Sewerage",
               status: "PENDING_ACCESS",
-              mode: "DEMO" as const,
-              last_updated: new Date().toISOString(),
-              data_age_seconds: 300,
-              latency_ms: 24,
+              mode: "UNAVAILABLE" as const,
+              last_updated: null,
+              data_age_seconds: null,
+              latency_ms: 0,
               error_rate: 0.0,
-              notes: "Canal gauges mock active"
+              notes: "BMA DDS data sharing agreement pending"
             },
             {
               source_id: "SRC_TRAFFY_FONDUE",
               name: "TRAFFY",
               full_name: "Traffy Fondue Platform",
-              status: "MOCK_ONLY",
-              mode: "DEMO" as const,
-              last_updated: new Date().toISOString(),
-              data_age_seconds: 600,
-              latency_ms: 15,
+              status: "PENDING_ACCESS",
+              mode: "UNAVAILABLE" as const,
+              last_updated: null,
+              data_age_seconds: null,
+              latency_ms: 0,
               error_rate: 0.0,
-              notes: "NECTEC OAuth2 pending"
+              notes: "NECTEC OAuth2 production token pending"
             },
             {
               source_id: "SRC_COPERNICUS_S1",
@@ -164,7 +176,7 @@ export default function AdminPage() {
               data_age_seconds: 50400,
               latency_ms: 35,
               error_rate: 0.0,
-              notes: "Observational evidence layer (Acquired ~14h ago)"
+              notes: "Observational radar layer (Acquired ~14h ago)"
             }
           ]).map((src) => {
             const modeColors: Record<string, string> = {

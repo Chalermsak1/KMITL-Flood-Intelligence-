@@ -78,8 +78,28 @@ export default function HelpPage() {
                   EMERGENCY FLOOD ASSISTANCE (SOS)
                 </h1>
                 <p className="text-xs text-gray-400">
-                  ส่งคำขอความช่วยเหลือฉุกเฉินไปยังศูนย์ความปลอดภัยและทีมกู้ภัย สจล.
+                  ระบบบันทึกคำขอความช่วยเหลือฉุกเฉินเพื่อส่งต่อไปยังทีมประสานงาน สจล.
                 </p>
+              </div>
+            </div>
+
+            {/* PILOT TEST NOTICE */}
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs text-amber-200">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-amber-300 font-bold block mb-0.5">PILOT TEST NOTICE (สถานะทดสอบระบบ):</strong>
+                ระบบ SOS ออนไลน์นี้อยู่ในช่วงทดสอบระบบนำร่อง (PILOT_TEST) ไม่ได้รับประกันการเข้าช่วยเหลือทันที หากมีเหตุฉุกเฉินเร่งด่วน กรุณาโทรติดต่อสายด่วนทางการทันที:
+                <div className="mt-2 flex flex-wrap gap-2 font-mono text-[11px]">
+                  <a href="tel:199" className="px-2.5 py-1 rounded-lg bg-red-600/30 border border-red-500/50 text-red-200 font-bold hover:bg-red-600/50">
+                    โทร 199 (ดับเพลิง/กู้ภัย)
+                  </a>
+                  <a href="tel:1669" className="px-2.5 py-1 rounded-lg bg-red-600/30 border border-red-500/50 text-red-200 font-bold hover:bg-red-600/50">
+                    โทร 1669 (กู้ชีพฉุกเฉิน)
+                  </a>
+                  <a href="tel:023298000" className="px-2.5 py-1 rounded-lg bg-surface border border-surface-border text-gray-200 hover:text-white">
+                    ศูนย์ความปลอดภัย สจล.: 02-329-8000
+                  </a>
+                </div>
               </div>
             </div>
 

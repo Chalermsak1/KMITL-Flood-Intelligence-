@@ -24,5 +24,9 @@ class SituationSummaryResponse(BaseModel):
     last_updated: datetime
     data_sources_available: int
     data_sources_total: int
+    confidence: str = "MEDIUM"  # LOW, MEDIUM, HIGH, UNKNOWN
+    sources_used: List[str] = ["SRC_USER_REPORT", "SRC_CANAL_SENSORS", "SRC_RADAR_TELEMETRY"]
+    data_cutoff: Optional[datetime] = None
+    unknown_factors: List[str] = []
     model_version: str = "2.1.0-explainable"
     config_version: str = "2026.09"

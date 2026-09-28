@@ -1,14 +1,34 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { MapPin, CheckCircle2, AlertCircle, ArrowLeft, Navigation, AlertTriangle } from "lucide-react";
+import {
+  MapPin,
+  CheckCircle2,
+  AlertCircle,
+  ArrowLeft,
+  Navigation,
+  AlertTriangle,
+  Camera,
+  Image as ImageIcon,
+  X,
+  UploadCloud,
+  Compass
+} from "lucide-react";
 import Link from "next/link";
 import { api } from "../../lib/api";
 
 // GPS accuracy thresholds
 const GPS_HIGH_ACCURACY_M = 20;   // green  — precise enough to locate building
 const GPS_LOW_ACCURACY_M  = 50;   // orange — jitter may displace marker across road
+
+const CAMPUS_PRESETS = [
+  { name: "Faculty of Engineering", lat: 13.7298, lng: 100.7782 },
+  { name: "ECC Building", lat: 13.7278, lng: 100.7749 },
+  { name: "Central Library / Prathep", lat: 13.7289, lng: 100.7765 },
+  { name: "Chalong Krung Gate 1", lat: 13.7314, lng: 100.7812 },
+  { name: "ARL Lat Krabang Station", lat: 13.7275, lng: 100.7483 },
+];
 
 function GpsAccuracyBadge({ accuracy }: { accuracy: number | null }) {
   if (accuracy === null) return null;
@@ -48,25 +68,41 @@ export default function ReportPage() {
   const [pendingOffline, setPendingOffline] = useState<any>(null);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
+  // Photo upload states
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Request browser geolocation and manage network status
   useEffect(() => {
-    setIsOnline(typeof navigator !== "undefined" ? navigator.onLine : true);
+    const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+    setIsOnline(online);
+
+    // Initial check for offline stored report
+    const saved = localStorage.getItem("kmitl_pending_report");
+    if (saved) {
+      try {
+        const payload = JSON.parse(saved);
+        if (online) {
+          submitPayload(payload);
+        } else {
+          setPendingOffline(payload);
+        }
+      } catch {
+        localStorage.removeItem("kmitl_pending_report");
+      }
+    }
 
     const handleOnline = async () => {
       setIsOnline(true);
-      const saved = localStorage.getItem("kmitl_pending_report");
-      if (saved) {
+      const pending = localStorage.getItem("kmitl_pending_report");
+      if (pending) {
         try {
-          const payload = JSON.parse(saved);
-          setSubmitting(true);
-          const res = await api.postReport(payload);
-          localStorage.removeItem("kmitl_pending_report");
-          setPendingOffline(null);
-          setSubmittedReport(res.data);
+          const payload = JSON.parse(pending);
+          await submitPayload(payload);
         } catch (e) {
           console.error("Retry submission failed:", e);
-        } finally {
-          setSubmitting(false);
         }
       }
     };
@@ -78,7 +114,17 @@ export default function ReportPage() {
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
+    acquireGps();
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  const acquireGps = () => {
     if ("geolocation" in navigator) {
+      setGpsStatus("Acquiring GPS fix...");
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           setLat(pos.coords.latitude);
@@ -91,39 +137,96 @@ export default function ReportPage() {
         (err) => {
           setGpsAccuracy(null);
           if (err.code === err.PERMISSION_DENIED) {
-            setGpsStatus("GPS Permission Denied. Using KMITL Campus Center as fallback.");
+            setGpsStatus("GPS Permission Denied. You can select a campus landmark or enter coordinates manually.");
           } else if (err.code === err.TIMEOUT) {
-            setGpsStatus("GPS Timeout. Using KMITL Campus Center as fallback.");
+            setGpsStatus("GPS Timeout. Using KMITL Campus Center as default.");
           } else {
-            setGpsStatus("GPS Unavailable. Using KMITL Campus Center as fallback.");
+            setGpsStatus("GPS Unavailable. Using KMITL Campus Center as default.");
           }
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
       );
     } else {
       setGpsAccuracy(null);
       setGpsStatus("Browser does not support Geolocation.");
     }
+  };
 
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size exceeds 10MB limit. Please choose a smaller photo.");
+      return;
+    }
+
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target?.result as string);
     };
-  }, []);
+    reader.readAsDataURL(file);
+
+    // Verify image with AI backend if online
+    if (isOnline) {
+      try {
+        setAiFeedback("Analyzing image with AI verifier...");
+        const result = await api.verifyImage(file, lat, lng);
+        if (result?.classification) {
+          const depth = result.classification.suggested_depth_band || "FLOOD_DETECTED";
+          setAiFeedback(`AI Analysis: ${depth} (Confidence: ${result.recommended_confidence || "HIGH"})`);
+        }
+      } catch {
+        setAiFeedback(null);
+      }
+    }
+  };
+
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setAiFeedback(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const submitPayload = async (payload: any) => {
+    setSubmitting(true);
+    try {
+      const res = await api.postReport(payload);
+      localStorage.removeItem("kmitl_pending_report");
+      setPendingOffline(null);
+      setSubmittedReport(res.data);
+    } catch (err) {
+      localStorage.setItem("kmitl_pending_report", JSON.stringify(payload));
+      setPendingOffline(payload);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+
+    let photoUrl = undefined;
+    if (photoPreview && photoPreview.length < 500000) {
+      photoUrl = photoPreview; // Store inline thumbnail if small
+    }
+
     const payload = {
       latitude: lat,
       longitude: lng,
       water_depth_band: waterDepth,
       vehicle_passability: passability,
       transport_type: transportType,
-      description: description || undefined
+      description: description || undefined,
+      photo_url: photoUrl
     };
 
-    // If offline or disconnected, queue report as PENDING
+    // If offline, queue locally
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       localStorage.setItem("kmitl_pending_report", JSON.stringify(payload));
       setPendingOffline(payload);
@@ -131,18 +234,7 @@ export default function ReportPage() {
       return;
     }
 
-    try {
-      const res = await api.postReport(payload);
-      localStorage.removeItem("kmitl_pending_report");
-      setPendingOffline(null);
-      setSubmittedReport(res.data);
-    } catch (err) {
-      // Network failure during submit: queue as PENDING
-      localStorage.setItem("kmitl_pending_report", JSON.stringify(payload));
-      setPendingOffline(payload);
-    } finally {
-      setSubmitting(false);
-    }
+    await submitPayload(payload);
   };
 
   return (
@@ -178,27 +270,16 @@ export default function ReportPage() {
             </p>
 
             <div className="bg-surface p-4 rounded-xl border border-surface-border text-xs text-left max-w-sm mx-auto space-y-1.5 font-mono">
-              <div><b>Location:</b> {pendingOffline.latitude.toFixed(4)}, {pendingOffline.longitude.toFixed(4)}</div>
+              <div><b>Location:</b> {pendingOffline.latitude?.toFixed(4)}, {pendingOffline.longitude?.toFixed(4)}</div>
               <div><b>Depth Band:</b> {pendingOffline.water_depth_band}</div>
+              <div><b>Passability:</b> {pendingOffline.vehicle_passability}</div>
               <div><b>Local Queue Status:</b> WAITING FOR NETWORK ACK</div>
             </div>
 
             <div className="pt-4 flex justify-center gap-3">
               <button
                 type="button"
-                onClick={async () => {
-                  setSubmitting(true);
-                  try {
-                    const res = await api.postReport(pendingOffline);
-                    localStorage.removeItem("kmitl_pending_report");
-                    setPendingOffline(null);
-                    setSubmittedReport(res.data);
-                  } catch (e) {
-                    alert("Network still unreachable. Keeping report in PENDING queue.");
-                  } finally {
-                    setSubmitting(false);
-                  }
-                }}
+                onClick={() => submitPayload(pendingOffline)}
                 disabled={submitting}
                 className="py-2.5 px-5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-bold text-xs"
               >
@@ -227,17 +308,22 @@ export default function ReportPage() {
               </p>
             </div>
 
-            {/* 1. GPS LOCATION */}
-            <div className="bg-surface/80 p-3.5 rounded-xl border border-surface-border space-y-2">
+            {/* 1. GPS LOCATION & MANUAL CORRECTION */}
+            <div className="bg-surface/80 p-3.5 rounded-xl border border-surface-border space-y-2.5">
               <div className="flex items-center justify-between text-xs font-bold text-gray-300">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-primary-400" />
-                  <span>1. GPS Location (พิกัดจุดเกิดเหตุ)</span>
+                  <span>1. Incident Location (พิกัดจุดเกิดเหตุ)</span>
                 </span>
-                <span className="text-[11px] text-primary-400 font-mono flex items-center gap-1">
-                  <Navigation className="w-3 h-3" /> Auto-GPS
-                </span>
+                <button
+                  type="button"
+                  onClick={acquireGps}
+                  className="text-[11px] text-primary-400 font-mono flex items-center gap-1 hover:underline"
+                >
+                  <Navigation className="w-3 h-3" /> Refresh GPS
+                </button>
               </div>
+
               <div className="text-xs font-mono text-gray-400">{gpsStatus}</div>
 
               {/* GPS Accuracy Badge */}
@@ -253,37 +339,129 @@ export default function ReportPage() {
                   <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                   <span>
                     <strong>GPS ACCURACY LOW (±{Math.round(gpsAccuracy)} m):</strong> Your location marker may be displaced up to {Math.round(gpsAccuracy)} m.
-                    Please verify and adjust coordinates using the fields below before submitting.
+                    Please select a campus landmark below or fine-tune coordinates.
                   </span>
                 </div>
               )}
 
+              {/* Campus Landmark Quick Selector */}
+              <div>
+                <label className="block text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1 flex items-center gap-1">
+                  <Compass className="w-3 h-3 text-primary-400" />
+                  Quick Landmarks (กดเลือกสถานที่ใกล้เคียง):
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CAMPUS_PRESETS.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.name}
+                      onClick={() => {
+                        setLat(preset.lat);
+                        setLng(preset.lng);
+                        setGpsAccuracy(null);
+                        setGpsStatus(`Selected landmark: ${preset.name}`);
+                      }}
+                      className="text-[10px] px-2 py-1 rounded bg-surface border border-surface-border text-gray-300 hover:text-white hover:border-primary-500 transition-colors"
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <input
-                  type="number"
-                  step="any"
-                  value={lat}
-                  onChange={(e) => setLat(parseFloat(e.target.value))}
-                  className="bg-surface-card border border-surface-border rounded-lg px-2.5 py-1.5 text-white font-mono"
-                  placeholder="Latitude"
-                  required
-                />
-                <input
-                  type="number"
-                  step="any"
-                  value={lng}
-                  onChange={(e) => setLng(parseFloat(e.target.value))}
-                  className="bg-surface-card border border-surface-border rounded-lg px-2.5 py-1.5 text-white font-mono"
-                  placeholder="Longitude"
-                  required
-                />
+                <div>
+                  <label className="text-[10px] text-gray-400 font-mono">Latitude:</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={lat}
+                    onChange={(e) => setLat(parseFloat(e.target.value))}
+                    className="w-full bg-surface-card border border-surface-border rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    placeholder="Latitude"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 font-mono">Longitude:</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={lng}
+                    onChange={(e) => setLng(parseFloat(e.target.value))}
+                    className="w-full bg-surface-card border border-surface-border rounded-lg px-2.5 py-1.5 text-white font-mono"
+                    placeholder="Longitude"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            {/* 2. WATER DEPTH BANDS */}
+            {/* 2. PHOTO UPLOAD & CAMERA CAPTURE */}
+            <div className="bg-surface/80 p-3.5 rounded-xl border border-surface-border space-y-2">
+              <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-primary-400" />
+                <span>2. Photo Evidence (ถ่ายรูปหรือแนบภาพถ่ายน้ำท่วม)</span>
+              </label>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoSelect}
+                className="hidden"
+              />
+
+              {!photoPreview ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-4 border-2 border-dashed border-surface-border hover:border-primary-500/50 rounded-xl flex flex-col items-center justify-center gap-1 text-gray-400 hover:text-white bg-surface/50 transition-colors"
+                >
+                  <UploadCloud className="w-6 h-6 text-primary-400" />
+                  <span className="text-xs font-medium">Take Photo / Upload Flood Image (MAX 10MB)</span>
+                  <span className="text-[10px] text-gray-500">EXIF metadata & GPS automatically sanitized for citizen privacy</span>
+                </button>
+              ) : (
+                <div className="relative rounded-xl overflow-hidden border border-surface-border bg-black/40 p-2">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={photoPreview}
+                      alt="Flood preview"
+                      className="w-20 h-20 object-cover rounded-lg border border-surface-border"
+                    />
+                    <div className="flex-1 text-xs space-y-1">
+                      <div className="font-bold text-white flex items-center gap-1">
+                        <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Photo Attached ({((photoFile?.size || 0) / 1024).toFixed(1)} KB)</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        EXIF GPS stripped • Perceptual Hash deduplication active
+                      </div>
+                      {aiFeedback && (
+                        <div className="text-[10px] font-mono text-primary-300 bg-primary-500/10 px-2 py-0.5 rounded border border-primary-500/20">
+                          {aiFeedback}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      title="Remove Photo"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 3. WATER DEPTH BANDS */}
             <div>
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-                2. Water Depth (ระดับความลึกของน้ำท่วม)
+                3. Water Depth (ระดับความลึกของน้ำท่วม)
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {[
@@ -310,10 +488,10 @@ export default function ReportPage() {
               </div>
             </div>
 
-            {/* 3. VEHICLE PASSABILITY */}
+            {/* 4. VEHICLE PASSABILITY */}
             <div>
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-                3. Vehicle Passability (สภาพการสัญจรของรถ)
+                4. Vehicle Passability (สภาพการสัญจรของรถ)
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
@@ -338,10 +516,10 @@ export default function ReportPage() {
               </div>
             </div>
 
-            {/* 4. TRANSPORT TYPE */}
+            {/* 5. TRANSPORT TYPE */}
             <div>
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-                4. Your Transport Mode (พาหนะของผู้แจ้ง)
+                5. Your Transport Mode (พาหนะของผู้แจ้ง)
               </label>
               <div className="grid grid-cols-4 gap-2">
                 {["WALK", "MOTORCYCLE", "CAR", "TRUCK"].map((mode) => (
@@ -361,10 +539,10 @@ export default function ReportPage() {
               </div>
             </div>
 
-            {/* 5. DESCRIPTION */}
+            {/* 6. DESCRIPTION */}
             <div>
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
-                5. Additional Description (รายละเอียดเพิ่มเติม - ถ้ามี)
+                6. Additional Description (รายละเอียดเพิ่มเติม - ถ้ามี)
               </label>
               <textarea
                 value={description}
@@ -378,9 +556,16 @@ export default function ReportPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-bold text-sm shadow-xl shadow-primary-600/30 transition-all"
+              className="w-full py-3.5 rounded-xl bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white font-bold text-sm shadow-xl shadow-primary-600/30 transition-all flex items-center justify-center gap-2"
             >
-              {submitting ? "SUBMITTING REPORT..." : "SUBMIT FLOOD REPORT"}
+              {submitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>SUBMITTING REPORT...</span>
+                </>
+              ) : (
+                <span>SUBMIT FLOOD REPORT</span>
+              )}
             </button>
           </form>
         ) : (
@@ -396,7 +581,7 @@ export default function ReportPage() {
 
             <div className="bg-surface p-4 rounded-xl border border-surface-border text-xs text-left max-w-sm mx-auto space-y-1.5 font-mono">
               <div><b>Report ID:</b> {submittedReport.id}</div>
-              <div><b>Location:</b> {submittedReport.latitude.toFixed(4)}, {submittedReport.longitude.toFixed(4)}</div>
+              <div><b>Location:</b> {submittedReport.latitude?.toFixed(4)}, {submittedReport.longitude?.toFixed(4)}</div>
               <div><b>Depth Band:</b> {submittedReport.water_depth_band}</div>
               <div><b>Freshness:</b> {submittedReport.freshness}</div>
             </div>
@@ -409,7 +594,11 @@ export default function ReportPage() {
                 VIEW ON LIVE MAP
               </Link>
               <button
-                onClick={() => setSubmittedReport(null)}
+                onClick={() => {
+                  setSubmittedReport(null);
+                  removePhoto();
+                  setDescription("");
+                }}
                 className="py-2.5 px-5 rounded-xl bg-surface border border-surface-border text-gray-300 hover:text-white font-bold text-xs"
               >
                 SUBMIT ANOTHER

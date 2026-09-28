@@ -30,3 +30,4 @@ class FloodReportResponse(BaseModel):
     observed_at: datetime
     data_age_min: int
     incident_id: Optional[uuid.UUID] = None
+    coverage_zone: Optional[str] = None
