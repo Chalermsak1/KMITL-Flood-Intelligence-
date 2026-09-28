@@ -1,0 +1,108 @@
+services:
+  # ----------------------------------------------------------------------------
+  # Spatial Database: PostgreSQL 16 with PostGIS 3.4
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: kmitl_flood_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kmitl_flood_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kmitl_flood_password_secure}
+      POSTGRES_DB: ${POSTGRES_DB:-kmitl_flood_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+      - ./infra/docker/postgis-init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kmitl_flood_user} -d ${POSTGRES_DB:-kmitl_flood_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flood_net
+
+  # ----------------------------------------------------------------------------
+  # In-Memory Cache & WebSocket Message Broker: Redis 7.2
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7.2-alpine
+    container_name: kmitl_flood_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - flood_net
+
+  # ----------------------------------------------------------------------------
+  # Backend API & Real-Time Gateway: FastAPI (Python 3.11)
+  # ----------------------------------------------------------------------------
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: kmitl_flood_api
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-kmitl_flood_user}:${POSTGRES_PASSWORD:-kmitl_flood_password_secure}@db:5432/${POSTGRES_DB:-kmitl_flood_db}
+      - DATABASE_SYNC_URL=postgresql://${POSTGRES_USER:-kmitl_flood_user}:${POSTGRES_PASSWORD:-kmitl_flood_password_secure}@db:5432/${POSTGRES_DB:-kmitl_flood_db}
+      - REDIS_URL=redis://redis:6379/0
+      - TMD_UID=${TMD_UID:-}
+      - TMD_UKEY=${TMD_UKEY:-}
+      - TRAFFY_API_KEY=${TRAFFY_API_KEY:-}
+      - COPERNICUS_CLIENT_ID=${COPERNICUS_CLIENT_ID:-}
+      - COPERNICUS_CLIENT_SECRET=${COPERNICUS_CLIENT_SECRET:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api:/app
+    networks:
+      - flood_net
+
+  # ----------------------------------------------------------------------------
+  # Frontend Application: Next.js + MapLibre GL JS
+  # ----------------------------------------------------------------------------
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: kmitl_flood_web
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/live
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - flood_net
+
+volumes:
+  postgis_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  flood_net:
+    driver: bridge

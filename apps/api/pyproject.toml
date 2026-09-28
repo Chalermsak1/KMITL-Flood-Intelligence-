@@ -1,0 +1,34 @@
+[project]
+name = "kmitl-flood-api"
+version = "1.0.0"
+description = "FastAPI Backend for KMITL Flood Intelligence Platform"
+authors = [{ name = "KMITL Flood Intelligence Team" }]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.28.0",
+    "pydantic>=2.6.4",
+    "pydantic-settings>=2.2.1",
+    "sqlalchemy>=2.0.28",
+    "asyncpg>=0.29.0",
+    "psycopg2-binary>=2.9.9",
+    "geoalchemy2>=0.14.4",
+    "shapely>=2.0.3",
+    "alembic>=1.13.1",
+    "redis>=5.0.3",
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.9",
+    "scikit-learn>=1.4.1",
+    "numpy>=1.26.4",
+    "pytest>=8.1.1",
+    "pytest-asyncio>=0.23.5",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
