@@ -75,13 +75,6 @@ WebGL GPU-accelerated interactive vector map rendering real-time road segment ex
 
 ---
 
-### End-to-End System Architecture
-Comprehensive non-AI vector data pipeline illustrating the progression from ingestion sources, spatial storage, resilient queuing, real-time message bus fanout, to responsive client interfaces.
-
-![KMITL Flood Intelligence System Architecture Workflow](docs/images/system_architecture_workflow.png)
-
----
-
 ### Mobile Citizen Reporting & Emergency SOS Dispatch
 Mobile-first interface featuring GPS-assisted geolocation, physical body-scale water depth indicators, pHash duplicate photo detection, and 1-tap emergency rescue dispatch with nearest shelter routing.
 
