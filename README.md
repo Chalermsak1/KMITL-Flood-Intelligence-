@@ -76,9 +76,9 @@ WebGL GPU-accelerated interactive vector map rendering real-time road segment ex
 ---
 
 ### End-to-End System Architecture
-Comprehensive data pipeline illustrating the progression from ingestion sources, spatial storage, resilient queuing, real-time message bus fanout, to responsive client interfaces.
+Comprehensive non-AI vector data pipeline illustrating the progression from ingestion sources, spatial storage, resilient queuing, real-time message bus fanout, to responsive client interfaces.
 
-![KMITL Flood Intelligence System Architecture](docs/images/system_architecture.jpg)
+![KMITL Flood Intelligence System Architecture Workflow](docs/images/system_architecture_workflow.png)
 
 ---
 
@@ -93,37 +93,73 @@ Mobile-first interface featuring GPS-assisted geolocation, physical body-scale w
 
 The architecture follows a decoupled, event-driven microservices pattern organized into four distinct horizontal operational tiers:
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                          TIER 1: MULTI-SOURCE INGESTION                                │
-│   TMD Radar          BMA Canal Gauges       Copernicus SAR S1      Citizen GPS Mobile  │
-│  (10-15m Weather)   (10-30m Canal MSL)     (6-12d Sat Extent)     (Sub-Second Reports) │
-└──────────────────────────────────────────┬─────────────────────────────────────────────┘
-                                           │ Normalized Ingestion
-                                           ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                     TIER 2: SPATIAL STORAGE & ANALYTICS ENGINE                         │
-│  • PostgreSQL 16 + PostGIS 3.4 (EPSG:4326 / EPSG:3857, GIST Spatial Indexing)          │
-│  • scikit-learn DBSCAN Clustering (250m radius / 2hr temporal sliding window)          │
-│  • Multi-Tier Durable Queue: Tier 1 (SQS) ──► Tier 2 (Redis) ──► Tier 3 (Disk WAL)    │
-└──────────────────────────────────────────┬─────────────────────────────────────────────┘
-                                           │ Async Job Dequeue & Event Publish
-                                           ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                         TIER 3: REAL-TIME EVENT HUB & BROKER                           │
-│  • Redis 7.2 Pub/Sub (Event Channel: flood:events)                                     │
-│  • Fast Event Fanout Hub (<150ms Delivery Latency)                                     │
-│  • 3-Tier Hybrid Transport: WebSockets (/ws/live) + SSE (/api/v1/realtime) + Polling   │
-│  • Background AsyncQueueWorker Fleet (pHash deduplication, EXIF sanitization)          │
-└──────────────────────────────────────────┬─────────────────────────────────────────────┘
-                                           │ Delta Stream (GeoJSON Features)
-                                           ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        TIER 4: NEXT.JS 14 RESPONSIVE CLIENT                            │
-│  • MapLibre GL JS 4.1.1 (60 FPS Vector Tiles, Dark/Light Mode, CARTO Basemap)         │
-│  • Live Situation Hero Banner (Freshness Age, Data Provenance, Risk State)             │
-│  • Flood-Exposure-Aware Routing Engine & Emergency SOS Shelter Dispatch                │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+<p align="center">
+  <img src="docs/images/system_architecture_workflow.png" alt="KMITL Flood Intelligence System Architecture Workflow" width="100%" />
+</p>
+
+### Interactive Architectural Workflow Diagram (Native Mermaid)
+
+```mermaid
+flowchart TD
+    subgraph T1["Tier 1: Multi-Source Ingestion"]
+        direction TB
+        TMD["📡 TMD Weather Radar<br/>(10-15m Rain Rate & dBZ)"]
+        BMA["🌊 BMA Canal Telemetry<br/>(10-30m Canal MSL & Deltas)"]
+        SAR["🛰️ Copernicus SAR S1<br/>(6-12d Satellite Extent)"]
+        Crowd["📱 Citizen GPS Reports<br/>(Sub-Second Real-Time)"]
+        Filter["⚙️ Ingestion & Quality Filter<br/>(EXIF Stripper, pHash, Geofence)"]
+        
+        TMD --> Filter
+        BMA --> Filter
+        SAR --> Filter
+        Crowd --> Filter
+    end
+
+    subgraph T2["Tier 2: Spatial Storage & Analytics"]
+        direction TB
+        PG[("🐘 PostgreSQL 16 + PostGIS 3.4<br/>(GIST Spatial Indexes)")]
+        DBSCAN["🧠 scikit-learn DBSCAN<br/>(Radius 250m / 2hr Window)"]
+        
+        subgraph Queue["🛡️ Multi-Tier Resilient Queue"]
+            direction TB
+            Q1["Tier 1: AWS SQS FIFO"]
+            Q2["Tier 2: Redis List (kmitl:durable:jobs)"]
+            Q3["Tier 3: Disk WAL Spool (os.fsync)"]
+            DLQ["Dead Letter Queue (DLQ)"]
+            Q1 -.-> Q2 -.-> Q3
+            Q3 -.-> DLQ
+        end
+        
+        PG <--> DBSCAN
+        PG <--> Queue
+    end
+
+    subgraph T3["Tier 3: Real-Time Event Hub & Broker"]
+        direction TB
+        PubSub["⚡ Redis 7.2 Pub/Sub<br/>(Channel: flood:events)"]
+        Workers["⚙️ AsyncQueueWorker Fleet<br/>(pHash, Exposure Recalc)"]
+        
+        subgraph Transport["🔄 3-Tier Hybrid Transport"]
+            WS["Tier 1: WebSockets (/ws/live)<br/>Latency &lt;150ms"]
+            SSE["Tier 2: SSE (/api/v1/realtime)<br/>Viewport BBox Filter"]
+            Poll["Tier 3: HTTP Polling (20s)<br/>Firewall Fallback"]
+        end
+        
+        PubSub --> Transport
+        Queue --> Workers
+        Workers --> PubSub
+    end
+
+    subgraph T4["Tier 4: Next.js 14 Responsive Client"]
+        direction TB
+        Map["🗺️ MapLibre GL JS<br/>(60 FPS WebGL Vector Map)"]
+        Hero["📊 Live Situation Hero<br/>(Freshness &lt;15s, WebSocket Live)"]
+        Route["🧭 Safe Route Evaluator<br/>(OSM Exposure Penalty x50)"]
+        SOS["🚨 SOS & Shelter Dispatch<br/>(Nearest Safe Haven Navigation)"]
+    end
+
+    Filter -->|REST Ingestion| PG
+    Transport -->|Real-Time Delta Stream| T4
 ```
 
 ### Detailed Tier Breakdown:
