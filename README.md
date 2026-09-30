@@ -1,4 +1,4 @@
-# 🌊 KMITL Flood Intelligence Platform
+#  KMITL Flood Intelligence Platform
 ### Real-Time Geospatial Disaster Intelligence & Decision-Support System for Lat Krabang & KMITL Campus
 
 [![Version](https://img.shields.io/badge/version-1.0.0--beta-blue.svg)](https://github.com/Chalermsak1/KMITL-Flood-Intelligence-)
@@ -13,7 +13,7 @@
 
 ---
 
-## 📌 1. Problem Statement & Real-World Challenges
+## 1. Problem Statement & Real-World Challenges
 
 ### The Environmental Context of Lat Krabang & KMITL
 King Mongkut's Institute of Technology Ladkrabang (KMITL) and the eastern suburbs of Lat Krabang are located in a low-lying, saucer-shaped alluvial floodplain within the lower Chao Phraya / Prawet Burirom canal basin. The area exhibits:
@@ -50,7 +50,7 @@ King Mongkut's Institute of Technology Ladkrabang (KMITL) and the eastern suburb
 
 ---
 
-## 💡 2. How KMITL Flood Intelligence Solves It
+##  2. How KMITL Flood Intelligence Solves It
 
 KMITL Flood Intelligence bridges these gaps by transforming disparate raw data into actionable geospatial intelligence:
 
@@ -66,7 +66,7 @@ $$\text{Flood Intelligence} = \text{Data Fusion} + \text{Real-Time Signals} + \t
 
 ---
 
-## 📸 3. Visual System Showcase
+## 3. Visual System Showcase
 
 ### Live Geospatial Operations Command Map
 WebGL GPU-accelerated interactive vector map rendering real-time road segment exposure (Safe, Ponding, Impassable), canal gauge water stages, citizen incident markers, and a 24-hour temporal evolution timeline scrubber.
@@ -89,7 +89,7 @@ Mobile-first interface featuring GPS-assisted geolocation, physical body-scale w
 
 ---
 
-## 🏛️ 4. In-Depth System Architecture Breakdown
+## 4. In-Depth System Architecture Breakdown
 
 The architecture follows a decoupled, event-driven microservices pattern organized into four distinct horizontal operational tiers:
 
@@ -157,7 +157,7 @@ The architecture follows a decoupled, event-driven microservices pattern organiz
 
 ---
 
-## ⚙️ 5. Technology Stack Specifications
+## 5. Technology Stack Specifications
 
 | Layer / Subsystem | Technology | Version | Key Technical Purpose |
 |---|---|---|---|
@@ -175,7 +175,7 @@ The architecture follows a decoupled, event-driven microservices pattern organiz
 
 ---
 
-## 🗂️ 6. Project Directory Structure
+##  6. Project Directory Structure
 
 ```text
 KMITL-Flood-Intelligence/
@@ -227,7 +227,7 @@ KMITL-Flood-Intelligence/
 
 ---
 
-## 🚀 7. Quick Start Guide (Local Docker Deployment)
+## 7. Quick Start Guide (Local Docker Deployment)
 
 ### Prerequisites
 - [Docker Desktop](https://www.docker.com/) (Version $\ge 24.0$) and Docker Compose (Version $\ge 2.20$)
@@ -266,17 +266,17 @@ docker compose exec api python -m app.scripts.load_osm_to_postgis
 *(Alternatively, run shortcuts `make migrate` and `make seed`)*
 
 ### Step 5: Access the Platform
-- 🌐 **Situational Dashboard:** [http://localhost:3000](http://localhost:3000)
-- 🗺️ **Interactive Vector Map:** [http://localhost:3000/map](http://localhost:3000/map)
-- 📢 **Citizen Incident Reporting:** [http://localhost:3000/report](http://localhost:3000/report)
-- 🚨 **Emergency SOS Assistance:** [http://localhost:3000/help](http://localhost:3000/help)
-- 🧭 **Safe Route Evaluator:** [http://localhost:3000/route](http://localhost:3000/route)
-- 🏢 **Operations Center (EOC):** [http://localhost:3000/admin](http://localhost:3000/admin)
-- 📖 **Interactive OpenAPI (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Situational Dashboard:** [http://localhost:3000](http://localhost:3000)
+- **Interactive Vector Map:** [http://localhost:3000/map](http://localhost:3000/map)
+-  **Citizen Incident Reporting:** [http://localhost:3000/report](http://localhost:3000/report)
+-  **Emergency SOS Assistance:** [http://localhost:3000/help](http://localhost:3000/help)
+- **Safe Route Evaluator:** [http://localhost:3000/route](http://localhost:3000/route)
+- **Operations Center (EOC):** [http://localhost:3000/admin](http://localhost:3000/admin)
+-  **Interactive OpenAPI (Swagger):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
-## 🧪 8. Quality Assurance & Automated Testing
+##  8. Quality Assurance & Automated Testing
 
 The backend includes a comprehensive automated test suite validating spatial geometry, API schemas, rate limits, clustering mathematics, and durability failover:
 
@@ -295,7 +295,7 @@ make test
 
 ---
 
-## 🔒 9. Privacy, Security & Data Governance
+##  9. Privacy, Security & Data Governance
 
 1. **Automatic EXIF Metadata Scrubbing:**
    All uploaded incident images undergo binary sanitization in the ingestion pipeline. Camera make/model, serial numbers, and raw hardware GPS EXIF metadata are permanently stripped before disk storage to safeguard user privacy.
@@ -308,14 +308,14 @@ make test
 
 ---
 
-## ⚠️ 10. Operational Disclaimer & Safety Boundaries
+##  10. Operational Disclaimer & Safety Boundaries
 
 > **IMPORTANT NOTICE:**  
 > KMITL Flood Intelligence is an informational decision-support and research prototype developed to provide situational awareness. It does **not** guarantee 100% road safety, precise flood depth accuracy, or emergency rescue response times. Conditions during tropical monsoons change rapidly. **In the event of life-threatening emergencies, citizens must immediately follow official instructions from the KMITL Safety Center (Tel: 02-329-8000 ext. 3100), National Emergency Medical Services (1669), or Police/Fire Rescue (191/199).**
 
 ---
 
-## 👥 11. Authors & Institutional Attribution
+## 11. Authors & Institutional Attribution
 
 - **Project:** KMITL Flood Intelligence Platform (Software-Only 100%)
 - **Institution:** King Mongkut's Institute of Technology Ladkrabang (KMITL)
