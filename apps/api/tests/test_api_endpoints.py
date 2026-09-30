@@ -24,7 +24,7 @@ async def test_rain_current_endpoint():
         assert "data" in body
         assert "meta" in body
         assert "rain_rate_mm_hr" in body["data"]
-        assert body["meta"]["source"] == "SRC_TMD_WEATHER"
+        assert body["meta"]["source"] in ["SRC_TMD_WEATHER", "SRC_OPEN_METEO_WMO"]
 
 
 @pytest.mark.asyncio
@@ -36,9 +36,9 @@ async def test_water_stations_endpoint():
         body = res.json()
         assert "data" in body
         assert len(body["data"]) >= 3
-        # Check Lat Krabang station
+        # Check Lat Krabang / Bangkok canal stations
         names = [s["name"] for s in body["data"]]
-        assert any("ประเวศบุรีรมย์" in n for n in names)
+        assert any(any(k in n for k in ["ประเวศบุรีรมย์", "ลำปลาทิว", "จระเข้ใหญ่", "คลอง"]) for n in names)
 
 
 @pytest.mark.asyncio

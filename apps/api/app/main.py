@@ -11,8 +11,9 @@ from app.api.v1 import (
     health, situation, reports, incidents,
     water, rain, satellite, help, shelters,
     data_status, routing, replay, realtime_sse,
-    metrics, beta
+    metrics, beta, roads
 )
+
 
 # Configure structured logging
 logging.basicConfig(
@@ -132,6 +133,8 @@ app.include_router(replay.router, prefix="/api/v1")
 app.include_router(realtime_sse.router, prefix="/api/v1")
 app.include_router(metrics.router, prefix="/api/v1")
 app.include_router(beta.router, prefix="/api/v1")
+app.include_router(roads.router, prefix="/api/v1")
+
 
 
 # Real-time WebSocket endpoint
@@ -151,6 +154,48 @@ async def websocket_live_endpoint(websocket: WebSocket):
         hub_manager.disconnect(websocket)
 
 
+from fastapi.responses import Response
+import httpx
+
+_tile_cache: dict[str, bytes] = {}
+
+
+@app.get("/api/v1/tiles/{z}/{x}/{y}.png")
+async def get_map_tile(z: int, x: int, y: int):
+    """
+    Proxy authentic OpenStreetMap tiles with compliant academic User-Agent
+    to ensure crisp basemap rendering without watermarks or referrer blocks.
+    """
+    tile_key = f"{z}_{x}_{y}"
+    if tile_key in _tile_cache:
+        return Response(
+            content=_tile_cache[tile_key],
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"}
+        )
+    url = f"https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    headers = {
+        "User-Agent": "KMITL-Flood-Intelligence/1.0 (flood@kmitl.ac.th; emergency-decision-support)",
+        "Accept": "image/png,image/*"
+    }
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code == 200:
+                if len(_tile_cache) > 2000:
+                    _tile_cache.clear()
+                _tile_cache[tile_key] = resp.content
+                return Response(
+                    content=resp.content,
+                    media_type="image/png",
+                    headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"}
+                )
+            return Response(status_code=resp.status_code)
+        except Exception as e:
+            logger.warning(f"Tile proxy error: {e}")
+            return Response(status_code=502)
+
+
 @app.get("/")
 async def root():
     return {
@@ -164,3 +209,4 @@ async def root():
         "feature_flags": "/api/v1/beta/features",
         "sos_status": "/api/v1/help/status",
     }
+

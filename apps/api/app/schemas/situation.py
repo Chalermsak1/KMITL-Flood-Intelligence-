@@ -30,3 +30,36 @@ class SituationSummaryResponse(BaseModel):
     unknown_factors: List[str] = []
     model_version: str = "2.1.0-explainable"
     config_version: str = "2026.09"
+
+
+class SituationEventItem(BaseModel):
+    id: str
+    timestamp: datetime
+    location: str
+    event_type: str  # CITIZEN_REPORT, VERIFIED_INCIDENT, ROAD_STATUS, WATER_LEVEL, RAINFALL, WARNING
+    source: str
+    status: str      # REPORTED, OBSERVED, VERIFIED, ESTIMATED
+    description: str
+    details: Optional[dict] = None
+
+
+class RoadStateChange(BaseModel):
+    road_name: str
+    segment_id: str
+    previous_status: str
+    current_status: str
+    change_type: str  # WORSENED, IMPROVED, UNCHANGED
+    depth_delta_cm: Optional[float] = None
+
+
+class SituationChangesResponse(BaseModel):
+    new_reports_count: int
+    roads_worsened_count: int
+    roads_improved_count: int
+    new_incidents_count: int
+    water_level_changes: List[str]
+    rain_changes: List[str]
+    road_changes: List[RoadStateChange]
+    comparison_window: str = "1 hour"
+    calculated_at: datetime
+

@@ -15,10 +15,12 @@ import {
   RefreshCw,
   Server,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeft
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { SituationSummary } from "../../lib/types";
+import clsx from "clsx";
 
 export default function AnalyticsPage() {
   const [summary, setSummary] = useState<SituationSummary | null>(null);
@@ -49,33 +51,34 @@ export default function AnalyticsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Synthetic distribution for visual decision-support chart
   const depthDistribution = [
     { label: "< 10 cm", count: 8, percentage: 32, color: "bg-emerald-500" },
-    { label: "10-20 cm", count: 11, percentage: 44, color: "bg-yellow-400" },
-    { label: "20-40 cm", count: 4, percentage: 16, color: "bg-orange-500" },
+    { label: "10–20 cm", count: 11, percentage: 44, color: "bg-amber-400" },
+    { label: "20–40 cm", count: 4, percentage: 16, color: "bg-orange-500" },
     { label: "> 40 cm", count: 2, percentage: 8, color: "bg-red-500" }
   ];
 
   return (
     <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-surface-border">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
         <div>
-          <div className="flex items-center gap-2 text-xs font-mono text-primary-400 uppercase tracking-widest mb-1">
+          <div className="flex items-center gap-2 text-xs font-mono text-blue-700 dark:text-blue-400 uppercase tracking-widest font-bold">
             <BarChart3 className="w-4 h-4" />
             <span>DISASTER DECISION INTELLIGENCE</span>
           </div>
-          <h1 className="text-2xl font-black text-white">Situational Analytics & Trends</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Comprehensive telemetry, hydrological indicators, crowd report distributions, and system performance.
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">
+            Situational Analytics & Hydrological Trends
+          </h1>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-3xl">
+            Correlated telemetry across canal gauges, precipitation intensity, DBSCAN crowd reports, and durable queue health.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <div className="text-[10px] font-mono text-gray-400">LAST TELEMETRY SYNC</div>
-            <div className="text-xs font-mono text-white font-bold">
+            <div className="text-[10px] font-mono text-slate-500">TELEMETRY SYNC</div>
+            <div className="text-xs font-mono text-slate-900 dark:text-white font-bold">
               {lastRefreshed.toLocaleTimeString()}
             </div>
           </div>
@@ -83,15 +86,15 @@ export default function AnalyticsPage() {
           <button
             onClick={loadData}
             disabled={loading}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface-card border border-surface-border text-xs font-bold text-gray-300 hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-colors shadow-sm"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={clsx("w-3.5 h-3.5", loading && "animate-spin")} />
             <span>Refresh</span>
           </button>
 
           <Link
             href="/replay"
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs uppercase tracking-wider transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition-colors shadow-sm"
           >
             <Clock className="w-3.5 h-3.5" />
             <span>Event Replay</span>
@@ -101,70 +104,70 @@ export default function AnalyticsPage() {
 
       {/* TOP KPI CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-gray-400 text-xs font-mono">
-            <span>OVERALL RISK</span>
-            <Activity className="w-4 h-4 text-primary-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-mono">
+            <span>OVERALL BASIN RISK</span>
+            <Activity className="w-4 h-4 text-blue-600" />
           </div>
-          <div className="text-2xl font-black text-white">
-            {summary ? summary.current_status : "MODERATE"}
+          <div className="text-2xl font-black text-slate-900 dark:text-white">
+            {summary ? summary.current_status : "LOW"}
           </div>
-          <div className="text-xs text-primary-400 font-mono">
-            Score: {summary ? summary.overall_risk_score.toFixed(1) : "54.2"}/100
+          <div className="text-xs text-blue-700 dark:text-blue-400 font-mono">
+            Score: {summary ? summary.overall_risk_score.toFixed(1) : "15.0"}/100
           </div>
         </div>
 
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-gray-400 text-xs font-mono">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-mono">
             <span>RAIN INTENSITY</span>
-            <CloudRain className="w-4 h-4 text-blue-400" />
+            <CloudRain className="w-4 h-4 text-indigo-600" />
           </div>
-          <div className="text-2xl font-black text-white">
-            {summary ? summary.rain_trend : "MODERATE"}
+          <div className="text-2xl font-black text-slate-900 dark:text-white">
+            {summary?.rain_trend || "LIGHT"}
           </div>
-          <div className="text-xs text-blue-400 font-mono">
-            TMD Radar Band
+          <div className="text-xs text-slate-500 font-mono">
+            TMD Radar (PENDING_ACCESS)
           </div>
         </div>
 
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-gray-400 text-xs font-mono">
-            <span>WATER TREND</span>
-            <Waves className="w-4 h-4 text-cyan-400" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-mono">
+            <span>CANAL STAGE TREND</span>
+            <Waves className="w-4 h-4 text-cyan-600" />
           </div>
-          <div className="text-2xl font-black text-white">
-            {summary ? summary.water_trend : "RISING"}
+          <div className="text-2xl font-black text-slate-900 dark:text-white">
+            {summary?.water_trend || "STABLE"}
           </div>
-          <div className="text-xs text-cyan-400 font-mono">
+          <div className="text-xs text-slate-500 font-mono">
             Canal Basin Prawet
           </div>
         </div>
 
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-5 space-y-2">
-          <div className="flex items-center justify-between text-gray-400 text-xs font-mono">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-2 shadow-sm">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-mono">
             <span>ACTIVE INCIDENTS</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <AlertTriangle className="w-4 h-4 text-orange-600" />
           </div>
-          <div className="text-2xl font-black text-white">
-            {summary ? summary.active_incidents : 5}
+          <div className="text-2xl font-black text-slate-900 dark:text-white">
+            {summary ? summary.active_incidents : 0}
           </div>
-          <div className="text-xs text-amber-400 font-mono">
-            DBSCAN Spatial Clusters
+          <div className="text-xs text-orange-700 dark:text-orange-400 font-mono">
+            Corroborated Clusters
           </div>
         </div>
       </div>
 
-      {/* RAIN VS CANAL WATER LEVEL SECTION */}
+      {/* RAIN VS CANAL WATER LEVEL & DEPTH DISTRIBUTION */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* HYDROMETRIC CORRELATION */}
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-6 space-y-5">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-primary-400" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
               <span>Rain vs Canal Hydro-Response (Past 6 Hours)</span>
             </h3>
-            <span className="text-[11px] font-mono text-gray-400 bg-surface px-2 py-0.5 rounded border border-surface-border">
-              30m Interval
+            <span className="text-[11px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+              30m Cadence
             </span>
           </div>
 
@@ -178,56 +181,50 @@ export default function AnalyticsPage() {
             ].map((row, idx) => (
               <div key={idx} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-gray-300 font-bold">{row.time}</span>
-                  <span className="text-gray-400">
-                    Rain: <strong className="text-blue-400">{row.rain} mm/hr</strong> | Canal:{" "}
-                    <strong className="text-cyan-400">+{row.water}m MSL</strong>
+                  <span className="text-slate-800 dark:text-slate-200 font-bold">{row.time}</span>
+                  <span className="text-slate-600 dark:text-slate-400">
+                    Rain: <strong className="text-blue-700 dark:text-blue-400">{row.rain} mm/hr</strong> | Canal:{" "}
+                    <strong className="text-cyan-700 dark:text-cyan-400">+{row.water}m MSL</strong>
                   </span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded border font-bold ${
+                    className={clsx(
+                      "text-[10px] px-1.5 py-0.2 rounded border font-bold",
                       row.status === "WARNING"
-                        ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-                        : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                    }`}
+                        ? "bg-amber-50 text-amber-800 border-amber-300"
+                        : "bg-emerald-50 text-emerald-800 border-emerald-300"
+                    )}
                   >
                     {row.status}
                   </span>
                 </div>
-                {/* Visual bar */}
-                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden flex">
-                  <div
-                    className="bg-blue-500 h-full rounded-l-full"
-                    style={{ width: `${(row.rain / 50) * 50}%` }}
-                  />
-                  <div
-                    className="bg-cyan-400 h-full rounded-r-full"
-                    style={{ width: `${(row.water / 1.0) * 50}%` }}
-                  />
+                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                  <div className="bg-blue-600 h-full rounded-l-full" style={{ width: `${(row.rain / 50) * 50}%` }} />
+                  <div className="bg-cyan-500 h-full rounded-r-full" style={{ width: `${(row.water / 1.0) * 50}%` }} />
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="pt-2 text-[11px] text-gray-400 font-mono flex items-center justify-between border-t border-surface-border">
+          <div className="pt-2 text-[11px] text-slate-500 font-mono flex items-center justify-between border-t border-slate-100 dark:border-slate-800">
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-blue-500 rounded-full" /> Rain (mm/hr)
+              <span className="w-2.5 h-2.5 bg-blue-600 rounded-full" /> Rain (mm/hr)
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 bg-cyan-400 rounded-full" /> Canal Level (m MSL)
+              <span className="w-2.5 h-2.5 bg-cyan-500 rounded-full" /> Canal Level (m MSL)
             </span>
-            <span className="text-amber-400 font-bold">Lag: ~25 mins</span>
+            <span className="text-amber-700 dark:text-amber-400 font-bold">Lag: ~25 mins</span>
           </div>
         </div>
 
-        {/* WATER DEPTH DISTRIBUTION FROM USER REPORTS */}
-        <div className="bg-surface-card border border-surface-border rounded-2xl p-6 space-y-5">
+        {/* WATER DEPTH DISTRIBUTION */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-amber-400" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Layers className="w-4 h-4 text-orange-600" />
               <span>Reported Water Depth Distribution</span>
             </h3>
-            <span className="text-[11px] font-mono text-gray-400 bg-surface px-2 py-0.5 rounded border border-surface-border">
-              25 Active Reports
+            <span className="text-[11px] font-mono text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
+              Corroborated Reports
             </span>
           </div>
 
@@ -235,72 +232,26 @@ export default function AnalyticsPage() {
             {depthDistribution.map((item, idx) => (
               <div key={idx} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-white font-medium">{item.label}</span>
-                  <span className="text-gray-400">
+                  <span className="text-slate-800 dark:text-slate-200 font-medium">{item.label}</span>
+                  <span className="text-slate-500">
                     {item.count} reports ({item.percentage}%)
                   </span>
                 </div>
-                <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${item.color}`}
-                    style={{ width: `${item.percentage}%` }}
-                  />
+                <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className={clsx("h-full rounded-full", item.color)} style={{ width: `${item.percentage}%` }} />
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="bg-surface/50 p-3.5 rounded-xl border border-surface-border/50 text-xs text-gray-300 space-y-1">
-            <div className="font-bold text-white flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>DBSCAN Corroboration Summary</span>
+          <div className="bg-slate-50 dark:bg-slate-800/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300 space-y-1">
+            <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>DBSCAN Spatial Clustering Analysis</span>
             </div>
-            <p className="text-[11px] text-gray-400 leading-relaxed">
-              76% of reports indicate water below axle height (passable for cars and trucks). The main critical bottleneck is focused along Chalong Krung Soi 1 underpass.
+            <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+              76% of citizen observations reflect water depth below 20cm, passable for vehicles. High alerts are isolated to culverts near Chalong Krung Soi 1.
             </p>
-          </div>
-        </div>
-      </div>
-
-      {/* SYSTEM OBSERVABILITY & QUEUE TELEMETRY */}
-      <div className="bg-surface-card border border-surface-border rounded-2xl p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Server className="w-5 h-5 text-primary-400" />
-            <h3 className="text-base font-bold text-white">System Health & Durable Queue Telemetry</h3>
-          </div>
-          <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
-            SYSTEM OPERATIONAL
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 font-mono">
-          <div className="bg-surface p-3.5 rounded-xl border border-surface-border">
-            <div className="text-[10px] text-gray-400 uppercase">Database Status</div>
-            <div className="text-sm font-bold text-emerald-400 mt-1">
-              {metrics ? metrics.database?.status : "UP"} ({metrics ? metrics.database?.latency_ms : 1.2} ms)
-            </div>
-          </div>
-
-          <div className="bg-surface p-3.5 rounded-xl border border-surface-border">
-            <div className="text-[10px] text-gray-400 uppercase">Queue Backlog</div>
-            <div className="text-sm font-bold text-white mt-1">
-              {metrics ? metrics.queue?.backlog_jobs : 0} pending jobs
-            </div>
-          </div>
-
-          <div className="bg-surface p-3.5 rounded-xl border border-surface-border">
-            <div className="text-[10px] text-gray-400 uppercase">Dead Letter Queue (DLQ)</div>
-            <div className="text-sm font-bold text-emerald-400 mt-1">
-              {metrics ? metrics.queue?.dead_letter_jobs : 0} failed jobs
-            </div>
-          </div>
-
-          <div className="bg-surface p-3.5 rounded-xl border border-surface-border">
-            <div className="text-[10px] text-gray-400 uppercase">Active Reports in DB</div>
-            <div className="text-sm font-bold text-primary-400 mt-1">
-              {metrics ? metrics.reports?.active_count : 25} active
-            </div>
           </div>
         </div>
       </div>

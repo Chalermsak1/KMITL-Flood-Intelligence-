@@ -36,7 +36,7 @@ def test_data_health_service_summary():
     health = DataSourceHealthService.get_static_sources()
     assert len(health) >= 4
     for h in health:
-        assert h["name"] in ["TMD", "BMA", "TRAFFY", "SATELLITE", "CROWD"]
+        assert h["name"] in ["TMD", "BMA", "TRAFFY", "SATELLITE", "CROWD", "THAIWATER", "OPEN_METEO"]
         assert h["status"] is not None
         assert h["mode"] is not None
         assert "credential_status" in h

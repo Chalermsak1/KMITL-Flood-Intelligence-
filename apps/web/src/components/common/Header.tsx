@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AlertCircle,
+  AlertTriangle,
   Activity,
   Map,
   FileWarning,
@@ -20,13 +20,17 @@ import {
   X,
   ChevronDown,
   Sun,
-  Moon
+  Moon,
+  Clock,
+  Radio
 } from "lucide-react";
 import clsx from "clsx";
 
 interface HeaderProps {
   isWsConnected?: boolean;
   transportMode?: "WEBSOCKET" | "SSE" | "POLLING";
+  lastUpdated?: Date;
+  isDegraded?: boolean;
 }
 
 interface NavItem {
@@ -36,27 +40,40 @@ interface NavItem {
   highlight?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportMode }) => {
+export const Header: React.FC<HeaderProps> = ({
+  isWsConnected = true,
+  transportMode,
+  lastUpdated,
+  isDegraded = false
+}) => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>("");
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof document !== "undefined") {
       setIsDark(document.documentElement.classList.contains("dark"));
     }
-  }, []);
+    const updateClock = () => {
+      const d = lastUpdated || new Date();
+      setCurrentTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+    return () => clearInterval(timer);
+  }, [lastUpdated]);
 
   const toggleTheme = () => {
     const willBeDark = !isDark;
     setIsDark(willBeDark);
     if (willBeDark) {
       document.documentElement.classList.add("dark");
-      try { localStorage.setItem("kmitl_theme", "dark"); } catch {}
+      try { localStorage.setItem("kmitl_theme_v2", "dark"); } catch {}
     } else {
       document.documentElement.classList.remove("dark");
-      try { localStorage.setItem("kmitl_theme", "light"); } catch {}
+      try { localStorage.setItem("kmitl_theme_v2", "light"); } catch {}
     }
   };
 
@@ -64,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
     { label: "Situation", href: "/", icon: Home },
     { label: "Live Map", href: "/map", icon: Map },
     { label: "Route", href: "/route", icon: Navigation },
-    { label: "Incidents", href: "/incidents", icon: AlertCircle },
+    { label: "Incidents", href: "/incidents", icon: AlertTriangle },
     { label: "Shelters", href: "/shelters", icon: Building },
     { label: "Report Flood", href: "/report", icon: FileWarning }
   ];
@@ -74,44 +91,52 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
     { label: "Data Provenance", href: "/data", icon: Database },
     { label: "Event Replay", href: "/replay", icon: History },
     { label: "Admin EOC", href: "/admin", icon: ShieldCheck },
-    { label: "Limitations & Safety", href: "/limitations", icon: AlertCircle }
+    { label: "Limitations & Safety", href: "/limitations", icon: AlertTriangle }
   ];
 
-  const allMobileNavItems: NavItem[] = [
-    ...mainNavItems,
-    ...moreNavItems,
-    { label: "Request SOS", href: "/help", icon: LifeBuoy, highlight: true }
-  ];
+  const isLive = isWsConnected && !isDegraded;
 
   return (
-    <header className="sticky top-0 z-50 bg-surface/90 backdrop-blur-md border-b border-surface-border">
-      {/* Beta Status Banner */}
-      <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-1 text-center text-xs text-blue-300 font-mono flex items-center justify-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-        <span>LIMITED BETA: Citizen reports are LIVE. Copernicus is OBSERVATION. Agency feeds (TMD/BMA/Traffy) are PENDING_ACCESS.</span>
+    <header className="sticky top-0 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors">
+      {/* OPERATIONS STATUS BANNER (Light, honest provenance) */}
+      <div className="bg-slate-100 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700/80 px-4 py-1 text-xs text-slate-700 dark:text-slate-300 font-mono flex items-center justify-between gap-2 overflow-x-auto whitespace-nowrap">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span className="text-[11px] font-medium">
+            <strong className="text-slate-900 dark:text-slate-100">DATA FEEDS:</strong> Citizen reports are <strong>LIVE</strong>. Copernicus SAR is <strong>OBSERVATION</strong>. External agency feeds are <strong>PENDING_ACCESS</strong>.
+          </span>
+        </div>
+        <div className="hidden md:flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+          <span>Lat Krabang Operations Zone</span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-slate-400" />
+            <span suppressHydrationWarning>Updated: {currentTime || "--:--:--"}</span>
+          </span>
+        </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-15 flex items-center justify-between">
         {/* Logo and Brand */}
-        <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-600 to-blue-700 flex items-center justify-center shadow-lg shadow-primary-500/20 group-hover:scale-105 transition-transform">
-            <Activity className="w-5 h-5 text-white" />
+        <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-700 dark:bg-blue-600 flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
+            <Activity className="w-4 h-4 text-white" />
           </div>
           <div>
-            <div className="font-black text-sm tracking-wider text-white flex items-center gap-2">
-              KMITL FLOOD INTELLIGENCE
-              <span className="text-[10px] px-1.5 py-0.2 bg-blue-500/20 text-blue-400 rounded font-mono border border-blue-500/30">
-                v1.0
+            <div className="font-extrabold text-sm tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+              <span>KMITL FLOOD INTELLIGENCE</span>
+              <span className="text-[10px] px-1.5 py-0.2 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 rounded font-mono border border-blue-200 dark:border-blue-700 font-semibold">
+                v1.0 (Operations)
               </span>
             </div>
-            <div className="text-[10px] text-gray-400 font-medium hidden sm:block">
-              Lat Krabang Situational Awareness & Assistance
+            <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
+              Emergency Situational Awareness & Operational Decision Support
             </div>
           </div>
         </Link>
 
-        {/* Navigation Items (Desktop) */}
-        <nav className="hidden xl:flex items-center gap-1">
+        {/* Desktop Navigation */}
+        <nav className="hidden lg:flex items-center gap-1">
           {mainNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
@@ -120,10 +145,10 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
                 key={item.href}
                 href={item.href}
                 className={clsx(
-                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all",
                   isActive
-                    ? "bg-primary-600/15 text-primary-400 border border-primary-500/30"
-                    : "text-gray-300 hover:text-white hover:bg-surface-card"
+                    ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                    : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -132,23 +157,24 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
             );
           })}
 
-          {/* Tools & Analytics Dropdown */}
+          {/* More Dropdown */}
           <div className="relative">
             <button
               onClick={() => setToolsDropdownOpen(!toolsDropdownOpen)}
               className={clsx(
-                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors text-gray-300 hover:text-white hover:bg-surface-card",
+                "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800",
                 moreNavItems.some((i) => pathname === i.href) &&
-                  "bg-primary-600/15 text-primary-400 border border-primary-500/30"
+                  "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
               )}
+              aria-label="More operational tools"
             >
               <span>More</span>
-              <ChevronDown className="w-3 h-3" />
+              <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
             {toolsDropdownOpen && (
               <div
-                className="absolute right-0 mt-2 w-48 bg-surface-card border border-surface-border rounded-xl shadow-2xl p-1.5 space-y-1 z-50"
+                className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-1.5 space-y-1 z-50"
                 onMouseLeave={() => setToolsDropdownOpen(false)}
               >
                 {moreNavItems.map((item) => {
@@ -162,11 +188,11 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
                       className={clsx(
                         "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-colors",
                         isActive
-                          ? "bg-primary-500/20 text-primary-300 font-bold"
-                          : "text-gray-300 hover:text-white hover:bg-surface"
+                          ? "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold"
+                          : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
                       )}
                     >
-                      <Icon className="w-3.5 h-3.5 text-primary-400" />
+                      <Icon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                       <span>{item.label}</span>
                     </Link>
                   );
@@ -175,74 +201,74 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
             )}
           </div>
 
-          {/* SOS Highlight Button */}
+          {/* SOS Emergency Button */}
           <Link
             href="/help"
-            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg shadow-red-600/20 uppercase tracking-wider transition-colors"
+            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-sm uppercase tracking-wider transition-colors"
           >
-            <LifeBuoy className="w-3.5 h-3.5" />
+            <LifeBuoy className="w-3.5 h-3.5 text-white" />
             <span>SOS</span>
           </Link>
         </nav>
 
-        {/* Live Pulse + Mobile Toggle */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-surface-card border border-surface-border text-xs font-mono">
+        {/* Telemetry Indicator + Theme Toggle + Mobile Menu Trigger */}
+        <div className="flex items-center gap-2">
+          {/* LIVE / DEGRADED indicator */}
+          <div
+            className={clsx(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-mono font-bold tracking-tight shadow-sm",
+              isLive
+                ? "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700"
+                : "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700"
+            )}
+            title={isLive ? "Telemetry: Live connected" : "Telemetry: Degraded or Polling fallback"}
+          >
             <span
               className={clsx(
                 "w-2 h-2 rounded-full",
-                isWsConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400 animate-pulse"
+                isLive ? "bg-emerald-600 dark:bg-emerald-400 animate-pulse" : "bg-amber-600 dark:bg-amber-400 animate-pulse"
               )}
             />
-            <span className="text-gray-300 hidden sm:inline text-[11px]">
-              {isWsConnected ? (transportMode ? `${transportMode} LIVE` : "LIVE STREAM") : "HTTP POLLING"}
+            <span>
+              {isLive ? (transportMode ? `${transportMode} LIVE` : "LIVE") : "DEGRADED"}
             </span>
           </div>
 
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card border border-surface-border text-xs font-medium hover:opacity-80 transition-all shadow-sm"
-            title={isDark ? "สลับเป็นโหมดสว่าง (Light Mode)" : "สลับเป็นโหมดมืด (Dark Mode)"}
-            aria-label="Toggle Light/Dark Theme"
+            className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label="Toggle theme"
           >
-            {isDark ? (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline text-gray-200 text-[11px]">โหมดสว่าง</span>
-              </>
-            ) : (
-              <>
-                <Moon className="w-3.5 h-3.5 text-blue-600" />
-                <span className="hidden sm:inline text-gray-700 text-[11px]">โหมดมืด</span>
-              </>
-            )}
+            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-slate-700" />}
           </button>
 
+          {/* Mobile SOS button */}
           <Link
             href="/help"
-            className="xl:hidden flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/30"
+            className="lg:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-sm uppercase"
           >
-            <LifeBuoy className="w-3.5 h-3.5" />
+            <LifeBuoy className="w-3.5 h-3.5 text-white" />
             <span>SOS</span>
           </Link>
 
-          {/* Hamburger Menu Toggle */}
+          {/* Mobile Menu Toggle button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden p-2 rounded-lg bg-surface-card border border-surface-border text-gray-300 hover:text-white transition-colors"
-            aria-label="Toggle navigation menu"
+            className="lg:hidden p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:text-slate-900 transition-colors"
+            aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile Drawer Menu */}
+      {/* Mobile Drawer (Accessible from top hamburger when opened) */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-surface border-b border-surface-border px-4 py-4 space-y-2 animate-in slide-in-from-top duration-200">
-          <div className="grid grid-cols-2 gap-2 text-xs font-medium">
-            {allMobileNavItems.map((item) => {
+        <div className="lg:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 space-y-2 animate-in slide-in-from-top duration-150">
+          <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
+            {[...mainNavItems, ...moreNavItems].map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
               return (
@@ -251,20 +277,13 @@ export const Header: React.FC<HeaderProps> = ({ isWsConnected = true, transportM
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={clsx(
-                    "flex items-center gap-2 px-3 py-2.5 rounded-xl transition-colors",
+                    "flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-colors",
                     isActive
-                      ? "bg-primary-600/20 text-primary-400 border border-primary-500/30 font-bold"
-                      : item.highlight
-                      ? "bg-red-600/20 text-red-400 border border-red-500/30 font-bold"
-                      : "text-gray-300 hover:text-white bg-surface-card border border-surface-border"
+                      ? "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700 font-bold"
+                      : "bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-white"
                   )}
                 >
-                  <Icon
-                    className={clsx(
-                      "w-4 h-4",
-                      item.highlight ? "text-red-400" : "text-primary-400"
-                    )}
-                  />
+                  <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                   <span>{item.label}</span>
                 </Link>
               );

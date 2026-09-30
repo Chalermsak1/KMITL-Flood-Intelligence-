@@ -1,264 +1,804 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   AlertTriangle,
   MapPin,
   LifeBuoy,
   FileWarning,
-  Map as MapIcon,
-  Droplets,
+  Navigation,
   CloudRain,
-  ShieldCheck,
+  Droplets,
   Clock,
   ArrowRight,
   Info,
-  TrendingUp,
-  Navigation
+  Search,
+  RefreshCw,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  Radio,
+  ExternalLink,
+  Layers,
+  Compass,
+  AlertCircle,
+  Building
 } from "lucide-react";
 import { api } from "../lib/api";
-import { SituationSummary, Incident, MetaEnvelope } from "../lib/types";
+import {
+  SituationSummary,
+  Incident,
+  FloodReport,
+  WaterStation,
+  AssistancePoint,
+  SatelliteObservation,
+  RainObservation,
+  MetaEnvelope,
+  SelectedFeature,
+  WebSocketEvent
+} from "../lib/types";
 import { RiskBadge } from "../components/common/RiskBadge";
 import { FreshnessBadge } from "../components/common/FreshnessBadge";
 import { ConfidenceIndicator } from "../components/common/ConfidenceIndicator";
+import { LayerControl, LayerState } from "../components/map/LayerControl";
+import { MarkerDetailPanel } from "../components/map/MarkerDetailPanel";
+import { RoadDetailPanel } from "../components/map/RoadDetailPanel";
+import { TimeEvolutionControl, TimeOffset } from "../components/map/TimeEvolutionControl";
+import { RoadCollectionResponse, RoadProperties, DrainageCollectionResponse } from "../lib/types";
+import { useWebSocket } from "../hooks/useWebSocket";
+import { useLocationContext } from "../hooks/useLocationContext";
+import { LocationContextBar } from "../components/location/LocationContextBar";
+import clsx from "clsx";
+
+const FloodMap = dynamic(
+  () => import("../components/map/FloodMap").then((mod) => mod.FloodMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full min-h-[460px] flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 text-slate-500 gap-3">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="font-mono text-xs text-blue-700 dark:text-blue-400">Loading MapLibre Tactical Canvas...</p>
+      </div>
+    ),
+  }
+);
+
+const CAMPUS_LOCATIONS = [
+  { name: "Engineering Gate", lat: 13.7298, lng: 100.7782, zoom: 16, segmentId: "SEG_CHALONG_KRUNG_CAMPUS" },
+  { name: "Chalong Krung Gate 1", lat: 13.7314, lng: 100.7812, zoom: 16, segmentId: "SEG_CHALONG_KRUNG_CAMPUS" },
+  { name: "ECC Building", lat: 13.7278, lng: 100.7749, zoom: 16, segmentId: "SEG_KMITL_ENGINEERING_LOOP" },
+  { name: "Central Library", lat: 13.7289, lng: 100.7765, zoom: 16, segmentId: "SEG_KMITL_ENGINEERING_LOOP" },
+  { name: "ARL Lat Krabang", lat: 13.7275, lng: 100.7483, zoom: 15, segmentId: "SEG_LAT_KRABANG_W" },
+  { name: "Hua Takhe Market", lat: 13.7215, lng: 100.7895, zoom: 15, segmentId: "SEG_LAT_KRABANG_E" }
+];
 
 export default function HomePage() {
+  // All operational layers enabled by default for immediate full situational awareness
+  const [layers, setLayers] = useState<LayerState>({
+    floodStatus: true,
+    waterDepth: true,
+    floodTrend: true,
+    waterFlow: true,
+    drainage: true,
+    reports: true,
+    incidents: true,
+    waterStations: true,
+    rain: true,
+    shelters: true,
+    satellite: false,
+  });
+
+  // Time Evolution State (Section 11)
+  const [timeOffset, setTimeOffset] = useState<TimeOffset>("NOW");
+
+  // Operational data states
   const [summary, setSummary] = useState<SituationSummary | null>(null);
   const [summaryMeta, setSummaryMeta] = useState<MetaEnvelope | null>(null);
-  const [recentIncidents, setRecentIncidents] = useState<Incident[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [reports, setReports] = useState<FloodReport[]>([]);
+  const [waterStations, setWaterStations] = useState<WaterStation[]>([]);
+  const [shelters, setShelters] = useState<AssistancePoint[]>([]);
+  const [rain, setRain] = useState<RainObservation | null>(null);
+  const [satellite, setSatellite] = useState<SatelliteObservation | null>(null);
+  const [roads, setRoads] = useState<RoadCollectionResponse | null>(null);
+  const [drainage, setDrainage] = useState<DrainageCollectionResponse | null>(null);
+
+  // UI state
   const [loading, setLoading] = useState(true);
+  const [isDegraded, setIsDegraded] = useState(false);
+  const [degradedMessage, setDegradedMessage] = useState<string | null>(null);
+  const [selectedFeature, setSelectedFeature] = useState<SelectedFeature | null>(null);
+  const [selectedRoad, setSelectedRoad] = useState<RoadProperties | null>(null);
+  const [centerTarget, setCenterTarget] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Independent Location Context (Section 1: Current vs Monitored Target)
+  const {
+    currentLocation,
+    gpsLoading,
+    gpsError,
+    homeLocation,
+    savedLocations,
+    selectedMonitoringLocation,
+    distanceToTargetKm,
+    requestCurrentLocation,
+    setMonitoringLocation,
+    setHomeLocation,
+    addWatchLocation,
+    removeWatchLocation
+  } = useLocationContext();
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [sumRes, incRes] = await Promise.all([
-          api.getSituationSummary(),
-          api.getIncidents()
-        ]);
-        setSummary(sumRes.data);
-        setSummaryMeta(sumRes.meta);
-        setRecentIncidents(incRes.data.slice(0, 4));
-      } catch (err) {
-        console.error("Failed to load situation summary:", err);
-      } finally {
-        setLoading(false);
+    setMounted(true);
+  }, []);
+
+  // Prioritize monitored location on initial load and when changed (Section 8)
+  useEffect(() => {
+    if (selectedMonitoringLocation) {
+      setCenterTarget({
+        lat: selectedMonitoringLocation.lat,
+        lng: selectedMonitoringLocation.lng,
+        zoom: selectedMonitoringLocation.zoom || 15.5
+      });
+    }
+  }, [selectedMonitoringLocation]);
+
+  // Center map on user's real physical GPS location without affecting monitoring target
+  const handleFlyToCurrentLocation = useCallback(() => {
+    if (currentLocation) {
+      setCenterTarget({
+        lat: currentLocation.lat,
+        lng: currentLocation.lng,
+        zoom: 16
+      });
+    } else {
+      requestCurrentLocation((loc) => {
+        setCenterTarget({
+          lat: loc.lat,
+          lng: loc.lng,
+          zoom: 16
+        });
+      });
+    }
+  }, [currentLocation, requestCurrentLocation]);
+
+  // Dedicated Roads loader by time offset
+  const loadRoadsData = useCallback(async (offset: TimeOffset) => {
+    try {
+      const res = await api.getRoadsStatus(offset);
+      if (res?.features) {
+        setRoads(res);
+      }
+    } catch (err) {
+      console.warn("Road status fetch error:", err);
+    }
+  }, []);
+
+  const handleTimeOffsetChange = useCallback((newOffset: TimeOffset) => {
+    setTimeOffset(newOffset);
+    loadRoadsData(newOffset);
+  }, [loadRoadsData]);
+
+  // Resilient data loader: Never crashes the page if an endpoint fails
+  const loadAllData = useCallback(async () => {
+    try {
+      const results = await Promise.allSettled([
+        api.getSituationSummary(),
+        api.getIncidents(),
+        api.getReports(),
+        api.getWaterStations(),
+        api.getShelters(),
+        api.getRain(),
+        api.getSatellite(),
+        api.getRoadsStatus(timeOffset),
+        api.getDrainageNetwork(),
+      ]);
+
+      const [sumRes, incRes, repRes, waterRes, shelterRes, rainRes, satRes, roadsRes, drainRes] = results;
+
+      let failures: string[] = [];
+
+      if (sumRes.status === "fulfilled" && sumRes.value?.data) {
+        setSummary(sumRes.value.data);
+        setSummaryMeta(sumRes.value.meta);
+      } else {
+        failures.push("Situation Summary");
+      }
+
+      if (incRes.status === "fulfilled" && incRes.value?.data) {
+        setIncidents(incRes.value.data);
+      } else {
+        failures.push("Incidents");
+      }
+
+      if (repRes.status === "fulfilled" && repRes.value?.data) {
+        setReports(repRes.value.data);
+      }
+
+      if (waterRes.status === "fulfilled" && waterRes.value?.data) {
+        setWaterStations(waterRes.value.data);
+      }
+
+      if (shelterRes.status === "fulfilled" && shelterRes.value?.data) {
+        setShelters(shelterRes.value.data);
+      }
+
+      if (rainRes.status === "fulfilled" && rainRes.value?.data) {
+        setRain(rainRes.value.data);
+      }
+
+      if (satRes.status === "fulfilled" && satRes.value?.data) {
+        setSatellite(satRes.value.data);
+      }
+
+      if (roadsRes.status === "fulfilled" && roadsRes.value?.features) {
+        setRoads(roadsRes.value);
+      }
+
+      if (drainRes.status === "fulfilled" && drainRes.value?.features) {
+        setDrainage(drainRes.value);
+      }
+
+      if (failures.length > 0) {
+        setIsDegraded(true);
+        setDegradedMessage(`Some data feeds are currently degraded (${failures.join(", ")}). Visualizing available telemetry.`);
+      } else {
+        setIsDegraded(false);
+        setDegradedMessage(null);
+      }
+
+      setLastRefreshed(new Date());
+    } catch (err: any) {
+      console.error("Home situation load error:", err);
+      setIsDegraded(true);
+      setDegradedMessage("Operational telemetry connectivity degraded. Map remains operational.");
+    } finally {
+      setLoading(false);
+    }
+  }, [timeOffset]);
+
+  // WebSocket Live Stream Handling
+  const handleWsEvent = useCallback((event: WebSocketEvent) => {
+    if (
+      event.event === "REPORT_CREATED" ||
+      event.event === "INCIDENT_UPDATED" ||
+      event.event === "WATER_UPDATED" ||
+      event.event === "RISK_CHANGED"
+    ) {
+      loadAllData();
+    }
+  }, [loadAllData]);
+
+  const { isConnected, transportMode } = useWebSocket({ onEvent: handleWsEvent });
+
+  useEffect(() => {
+    loadAllData();
+    const interval = setInterval(loadAllData, 25000);
+    return () => clearInterval(interval);
+  }, [loadAllData]);
+
+  // Handle location search filtering / selection
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    const match = CAMPUS_LOCATIONS.find(loc =>
+      loc.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    if (match) {
+      setCenterTarget({ lat: match.lat, lng: match.lng, zoom: match.zoom });
+      if (match.segmentId && roads?.features) {
+        const found = roads.features.find(f => f.properties.road_segment_id === match.segmentId);
+        if (found) {
+          setSelectedRoad(found.properties);
+          setSelectedFeature(null);
+        }
       }
     }
-    loadData();
-    const interval = setInterval(loadData, 20000);
-    return () => clearInterval(interval);
+  };
+
+  // Filtered counts for layer badges
+  const layerCounts = useMemo(() => ({
+    incidents: incidents.length,
+    reports: reports.length,
+    waterStations: waterStations.length,
+    shelters: shelters.length,
+    floodedRoads: roads?.features.filter(f => f.properties.status !== "NO_EVIDENCE" && f.properties.status !== "UNKNOWN").length || 0
+  }), [incidents.length, reports.length, waterStations.length, shelters.length, roads]);
+
+  // Synthesized "What is happening now" text
+  const situationNarrative = useMemo(() => {
+    if (summary?.explanation && summary.explanation.length > 0) {
+      return summary.explanation;
+    }
+    if (incidents.length > 0) {
+      return [
+        `Detected ${incidents.length} active spatio-temporal flood clusters in the Lat Krabang basin.`,
+        `Corroborated by ${reports.length} recent citizen field reports.`,
+        `Canal water levels and drainage pump stations are being continuously monitored.`
+      ];
+    }
+    return [
+      "No critical flood bottlenecks observed across monitored KMITL campus roads.",
+      "Citizen observation reports indicate normal traffic passability in primary corridors.",
+      "External precipitation radar and drainage feeds are on high alert."
+    ];
+  }, [summary, incidents, reports]);
+
+  const handleSelectFeature = useCallback((feat: any) => {
+    setSelectedFeature(feat);
+    setSelectedRoad(null);
+  }, []);
+
+  const handleSelectRoad = useCallback((road: any) => {
+    setSelectedRoad(road);
+    setSelectedFeature(null);
   }, []);
 
   return (
-    <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* HERO SITUATION BANNER */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-surface-card to-surface border border-surface-border p-6 sm:p-8 shadow-2xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-surface-border">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-gray-400 uppercase tracking-widest mb-2">
-              <MapPin className="w-4 h-4 text-primary-400" />
-              <span>PRIMARY WATCH AREA: KMITL / LAT KRABANG BASIN</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex flex-wrap items-center gap-3">
-              CURRENT FLOOD SITUATION
-              {summary && (
-                <RiskBadge
-                  level={summary.current_status}
-                  score={summary.overall_risk_score}
-                  size="lg"
-                />
-              )}
-            </h1>
+    <div className="flex-1 flex flex-col w-full bg-slate-50 dark:bg-slate-950">
+      {/* DEGRADED STATE WARNING BANNER (IF API FAILS) */}
+      {isDegraded && degradedMessage && (
+        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-800 dark:text-amber-200 font-mono flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>{degradedMessage}</span>
           </div>
+          <button
+            onClick={loadAllData}
+            className="text-[11px] underline font-bold hover:text-amber-950 dark:hover:text-white"
+          >
+            Retry Feeds
+          </button>
+        </div>
+      )}
 
-          {/* Freshness and Provenance */}
-          <div className="flex flex-col items-start md:items-end gap-1.5 font-mono text-xs">
-            {summaryMeta && (
-              <FreshnessBadge
-                freshness={summaryMeta.freshness}
-                dataAgeText={`${summaryMeta.data_age_seconds || 45}s ago`}
-              />
+      {/* ─── LOCATION CONTEXT BAR: CURRENT LOCATION vs MONITORING TARGET (Section 5, 18) ─── */}
+      <div className="bg-slate-100/90 dark:bg-slate-950/90 border-b border-slate-200 dark:border-slate-800/80 px-3 sm:px-4 py-2">
+        <div className="max-w-7xl mx-auto">
+          <LocationContextBar
+            currentLocation={currentLocation}
+            selectedMonitoringLocation={selectedMonitoringLocation}
+            homeLocation={homeLocation}
+            savedLocations={savedLocations}
+            distanceToTargetKm={distanceToTargetKm}
+            gpsLoading={gpsLoading}
+            gpsError={gpsError}
+            onRequestCurrentLocation={requestCurrentLocation}
+            onFlyToCurrentLocation={handleFlyToCurrentLocation}
+            onSelectMonitoringLocation={setMonitoringLocation}
+            onSetHomeLocation={setHomeLocation}
+            onAddWatchLocation={addWatchLocation}
+            onRemoveWatchLocation={removeWatchLocation}
+          />
+        </div>
+      </div>
+
+      {/* ─── 1. MAP-FIRST PRIMARY VISUAL AREA ─────────────────────────────────── */}
+      <section className="relative w-full h-[62vh] sm:h-[68vh] lg:h-[72vh] border-b border-slate-200 dark:border-slate-800 overflow-hidden bg-slate-100 dark:bg-slate-900">
+        {/* Full-bleed interactive MapLibre canvas */}
+        <FloodMap
+          layers={layers}
+          roads={roads}
+          drainage={drainage}
+          incidents={incidents}
+          reports={reports}
+          waterStations={waterStations}
+          shelters={shelters}
+          satellite={layers.satellite ? satellite : null}
+          centerTarget={centerTarget}
+          currentLocation={currentLocation}
+          monitoredLocation={selectedMonitoringLocation}
+          onRequestCurrentLocation={handleFlyToCurrentLocation}
+          gpsLoading={gpsLoading}
+          onSelectFeature={handleSelectFeature}
+          onSelectRoad={handleSelectRoad}
+          className="w-full h-full"
+        />
+
+        {/* TOP-LEFT: SEARCH & CAMPUS PRESET CHIPS */}
+        <div className="absolute top-3 left-3 w-48 sm:w-64 md:w-80 z-20 space-y-2 pointer-events-none hidden sm:block">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="pointer-events-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl shadow-md p-1.5 flex items-center gap-2"
+          >
+            <Search className="w-4 h-4 text-slate-400 ml-1.5 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search KMITL area or landmark..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="text-slate-400 hover:text-slate-600 text-xs px-1"
+              >
+                ✕
+              </button>
             )}
-            <div className="text-gray-400 text-[11px] flex items-center gap-1">
-              <Clock className="w-3 h-3 text-gray-500" />
-              <span>Fused: Citizen Reports (LIVE) + Copernicus SAR (OBSERVATION)</span>
-            </div>
+          </form>
+
+          {/* Quick Landmark Chips */}
+          <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            {CAMPUS_LOCATIONS.slice(0, 4).map((loc) => (
+              <button
+                key={loc.name}
+                onClick={() => {
+                  setCenterTarget({ lat: loc.lat, lng: loc.lng, zoom: loc.zoom });
+                  if (loc.segmentId && roads?.features) {
+                    const found = roads.features.find(f => f.properties.road_segment_id === loc.segmentId);
+                    if (found) {
+                      setSelectedRoad(found.properties);
+                      setSelectedFeature(null);
+                    }
+                  }
+                }}
+                className="text-[10px] font-mono px-2 py-1 rounded-lg bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:border-blue-500 whitespace-nowrap shadow-sm transition-colors"
+              >
+                {loc.name}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* METRICS GRID */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-6">
-          <div className="bg-surface/60 border border-surface-border/60 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-              <CloudRain className="w-4 h-4 text-indigo-400" />
-              <span>Rainfall Activity</span>
-            </div>
-            <div className="text-lg font-bold text-white uppercase">
-              {summary?.rain_trend || "MONITORING"}
-            </div>
-            <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-              TMD Feed: PENDING_ACCESS
-            </div>
-          </div>
-
-          <div className="bg-surface/60 border border-surface-border/60 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-              <Droplets className="w-4 h-4 text-cyan-400" />
-              <span>Canal Water Stage</span>
-            </div>
-            <div className="text-lg font-bold text-cyan-400 flex items-center gap-1.5 uppercase">
-              {summary?.water_trend || "MONITORING"}
-            </div>
-            <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-              BMA Feed: PENDING_ACCESS
-            </div>
-          </div>
-
-          <div className="bg-surface/60 border border-surface-border/60 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-              <AlertTriangle className="w-4 h-4 text-orange-400" />
-              <span>Active Incidents</span>
-            </div>
-            <div className="text-lg font-bold text-orange-400">
-              {summary?.active_incidents ?? recentIncidents.length} Clusters
-            </div>
-            <div className="text-[11px] text-gray-400 font-mono mt-0.5">
-              Corroborated by reports
-            </div>
-          </div>
-
-          <div className="bg-surface/60 border border-surface-border/60 rounded-xl p-4">
-            <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-              <LifeBuoy className="w-4 h-4 text-red-400" />
-              <span>Emergency Help</span>
-            </div>
-            <div className="text-lg font-bold text-red-400">
-              PILOT_TEST
-            </div>
-            <div className="text-[11px] text-amber-400 font-mono mt-0.5">
-              Emergency: Call 199 / 1669
-            </div>
-          </div>
+        {/* TIME EVOLUTION CONTROL (Section 11) - Desktop centered, Mobile/Tablet second row */}
+        <div className="absolute top-14 left-3 lg:top-3 lg:left-1/2 lg:-translate-x-1/2 z-20 max-w-[calc(100vw-1.5rem)]">
+          <TimeEvolutionControl
+            activeOffset={timeOffset}
+            onChange={handleTimeOffsetChange}
+          />
         </div>
 
-        {/* EXPLAINABILITY SECTION (WHY IS THIS AREA HIGH RISK?) */}
-        {summary && summary.explanation && (
-          <div className="mt-2 bg-surface/80 rounded-xl p-4 border border-surface-border">
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-300 uppercase tracking-wider mb-2">
-              <Info className="w-4 h-4 text-primary-400" />
-              <span>Explainable Risk Assessment (Why is this area alert level?)</span>
-            </div>
-            <ul className="space-y-1.5 text-xs sm:text-sm text-gray-300">
-              {summary.explanation.map((item, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <span className="text-primary-400 font-bold">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* PRIMARY CALL TO ACTION BUTTONS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-6 mt-4 border-t border-surface-border">
-          <Link
-            href="/map"
-            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-bold text-xs shadow-lg shadow-primary-600/30 transition-all hover:scale-[1.02]"
-          >
-            <MapIcon className="w-4 h-4" />
-            <span>LIVE FLOOD MAP</span>
-          </Link>
-
-          <Link
-            href="/report"
-            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-orange-600/20 hover:bg-orange-600/30 border border-orange-500/40 text-orange-300 font-bold text-xs transition-all hover:scale-[1.02]"
-          >
-            <FileWarning className="w-4 h-4 text-orange-400" />
-            <span>REPORT FLOOD</span>
-          </Link>
-
-          <Link
-            href="/route"
-            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-surface-card hover:bg-surface-border border border-surface-border text-white font-bold text-xs transition-all hover:scale-[1.02]"
-          >
-            <Navigation className="w-4 h-4 text-primary-400" />
-            <span>EVALUATE ROUTE</span>
-          </Link>
-
-          <Link
-            href="/help"
-            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-red-600/20 hover:bg-red-600/30 border border-red-500/40 text-red-300 font-bold text-xs transition-all hover:scale-[1.02]"
-          >
-            <LifeBuoy className="w-4 h-4 text-red-400" />
-            <span>REQUEST HELP (SOS)</span>
-          </Link>
-        </div>
-      </section>
-
-      {/* ACTIVE INCIDENTS FEED */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-orange-400" />
-            <span>Active Flood Incidents in Lat Krabang</span>
-          </h2>
-          <Link
-            href="/map"
-            className="text-xs text-primary-400 hover:text-primary-300 font-medium flex items-center gap-1"
-          >
-            <span>See all on map</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+        {/* TOP-RIGHT: COLLAPSIBLE MAP LAYER CONTROL */}
+        <div className="absolute top-3 right-3 z-20">
+          <LayerControl layers={layers} onChange={setLayers} counts={layerCounts} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {recentIncidents.map((inc) => (
-            <div
-              key={inc.id}
-              className="bg-surface-card border border-surface-border rounded-xl p-4 flex flex-col justify-between hover:border-primary-500/40 transition-colors"
-            >
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="text-xs font-mono text-orange-400 font-bold">
-                    INCIDENT #{inc.incident_number}
-                  </span>
-                  <ConfidenceIndicator confidence={inc.confidence} />
+        {/* BOTTOM-CENTER / LEGEND: EXPLICIT ROAD STATUS SEMANTICS (Section 20 & Section 3) */}
+        <div className="hidden lg:flex items-center gap-3 absolute bottom-3 left-1/2 -translate-x-1/2 z-20 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 shadow-md text-[10px] font-mono select-none">
+          <span className="font-bold text-slate-700 dark:text-slate-300">Road Status:</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> No Evidence</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500" /> Water Present</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> Flooded</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Severely Flooded</span>
+          <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-900" /> Blocked</span>
+        </div>
+
+        {/* BOTTOM-LEFT: COMPACT SITUATION SUMMARY & STATUS CARD (COLLAPSIBLE) */}
+        <div className="absolute bottom-3 left-3 z-20 max-w-sm w-[calc(100vw-1.5rem)] sm:w-88">
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg p-3.5 space-y-2.5 transition-all">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0" />
+                <div>
+                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 truncate max-w-[190px]">
+                    {selectedMonitoringLocation.name}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                    {selectedMonitoringLocation.isHome ? "⌂ Monitored Home" : "🎯 Monitored Target"}
+                    {distanceToTargetKm !== null ? ` · ${distanceToTargetKm} km away` : " · GPS Off"}
+                  </div>
                 </div>
-                <h3 className="font-bold text-white text-base mb-2">{inc.title}</h3>
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 mb-3">
-                  <div className="bg-surface/50 p-2 rounded-lg border border-surface-border/50">
-                    <span className="text-gray-400 block text-[10px]">ระดับน้ำโดยประมาณ</span>
-                    <span className="font-bold text-orange-300">
-                      {inc.consensus_depth_band.replace("DEPTH_", "").replace("_", " ")}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSummaryCollapsed(!summaryCollapsed)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
+                aria-label={summaryCollapsed ? "Expand situation card" : "Collapse situation card"}
+              >
+                {summaryCollapsed ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {/* Risk Badge & Score Header */}
+            <div className="flex items-center justify-between gap-2">
+              <RiskBadge
+                level={summary?.current_status || "LOW"}
+                score={summary?.overall_risk_score}
+                size="md"
+              />
+              <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                {mounted ? `Cutoff: ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "--:--"}
+              </span>
+            </div>
+
+            {/* Collapsible Details */}
+            {!summaryCollapsed && (
+              <div className="space-y-2 pt-1 text-xs">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
+                      Active Hotspots
+                    </span>
+                    <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                      {incidents.length} Clusters
                     </span>
                   </div>
-                  <div className="bg-surface/50 p-2 rounded-lg border border-surface-border/50">
-                    <span className="text-gray-400 block text-[10px]">การสัญจร</span>
-                    <span className="font-bold text-white">{inc.consensus_passability}</span>
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-200/80 dark:border-slate-700/60">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block font-medium">
+                      Field Reports (24h)
+                    </span>
+                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                      {reports.length} Reports
+                    </span>
                   </div>
                 </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300 font-mono pt-1">
+                  <span>Rain: <strong className="text-slate-800 dark:text-slate-100">{summary?.rain_trend || "NONE"}</strong></span>
+                  <span>Canals: <strong className="text-slate-800 dark:text-slate-100">{summary?.water_trend || "STABLE"}</strong></span>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-surface-border">
-                <span>{inc.report_count} รายงานที่สอดคล้องกัน</span>
-                <span>ล่าสุด {inc.last_report_age_min} นาทีที่แล้ว</span>
-              </div>
-            </div>
-          ))}
+            )}
+          </div>
         </div>
+
+        {/* BOTTOM-RIGHT: ROAD OR MARKER DETAILS INSPECTOR DRAWER */}
+        {selectedRoad ? (
+          <div className="absolute bottom-3 right-3 z-30 max-w-sm w-[calc(100vw-1.5rem)] sm:w-96">
+            <RoadDetailPanel
+              road={selectedRoad}
+              onClose={() => setSelectedRoad(null)}
+            />
+          </div>
+        ) : selectedFeature ? (
+          <div className="absolute bottom-3 right-3 z-30 max-w-sm w-[calc(100vw-1.5rem)] sm:w-96">
+            <MarkerDetailPanel
+              feature={selectedFeature}
+              onClose={() => setSelectedFeature(null)}
+            />
+          </div>
+        ) : null}
       </section>
 
-      {/* SATELLITE & SENSOR ATTRIBUTION FOOTER */}
-      <section className="bg-surface-card/40 border border-surface-border/50 rounded-xl p-4 text-xs text-gray-400 space-y-2">
-        <div className="font-bold text-gray-300 uppercase tracking-wider text-[11px]">
-          DATA PROVENANCE & TRANSPARENCY NOTICE
+      {/* ─── 2. SITUATION INTELLIGENCE & OPERATIONAL ASSESSMENT ───────────────── */}
+      <section className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* COMPACT KPI METRIC CARDS */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Current Risk */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Current Risk Score
+              </span>
+              <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-black text-slate-900 dark:text-white">
+                {summary?.overall_risk_score ?? 15}
+              </span>
+              <span className="text-xs font-mono text-slate-500">/ 100</span>
+            </div>
+            <RiskBadge level={summary?.current_status || "LOW"} size="sm" />
+          </div>
+
+          {/* Card 2: Rain Activity */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Rainfall & Radar
+              </span>
+              <CloudRain className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="text-xl font-bold text-slate-900 dark:text-white uppercase">
+              {summary?.rain_trend || "LIGHT / NONE"}
+            </div>
+            <div className="text-[11px] font-mono text-slate-500">
+              Source: TMD Weather Radar (PENDING_ACCESS)
+            </div>
+          </div>
+
+          {/* Card 3: Active Reports */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Active Reports
+              </span>
+              <FileWarning className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="text-2xl font-black text-blue-700 dark:text-blue-400">
+              {reports.length}
+            </div>
+            <div className="text-[11px] font-mono text-slate-500">
+              Mode: LIVE Citizen Field Submissions
+            </div>
+          </div>
+
+          {/* Card 4: Affected Areas */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Monitored Corridors
+              </span>
+              <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <div className="text-xl font-bold text-slate-900 dark:text-white">
+              {incidents.length > 0 ? `${incidents.length} Corridors` : "All Clear"}
+            </div>
+            <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+              <button
+                type="button"
+                onClick={() => {
+                  const found = roads?.features.find(f => f.properties.road_segment_id === "SEG_CHALONG_KRUNG_CAMPUS");
+                  if (found) {
+                    setSelectedRoad(found.properties);
+                    setSelectedFeature(null);
+                    setCenterTarget({ lat: 13.7298, lng: 100.7782, zoom: 16 });
+                  }
+                }}
+                className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700"
+              >
+                Chalong Krung
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const found = roads?.features.find(f => f.properties.road_segment_id === "SEG_LAT_KRABANG_E");
+                  if (found) {
+                    setSelectedRoad(found.properties);
+                    setSelectedFeature(null);
+                    setCenterTarget({ lat: 13.7215, lng: 100.7895, zoom: 15 });
+                  }
+                }}
+                className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700"
+              >
+                Hua Takhe
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const found = roads?.features.find(f => f.properties.road_segment_id === "SEG_LAT_KRABANG_W");
+                  if (found) {
+                    setSelectedRoad(found.properties);
+                    setSelectedFeature(null);
+                    setCenterTarget({ lat: 13.7275, lng: 100.7483, zoom: 15 });
+                  }
+                }}
+                className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold border border-slate-200 dark:border-slate-700"
+              >
+                ARL
+              </button>
+            </div>
+          </div>
         </div>
-        <p>
-          ระบบ KMITL Flood Intelligence ประมวลผลจากข้อมูลเปิด (Open Data) ของกรมอุตุนิยมวิทยา (TMD), สำนักการระบายน้ำ กทม. (DDS), ภาพถ่ายดาวเทียม Sentinel-1 C-SAR ขององค์การอวกาศยุโรป (ESA), และรายงานจากประชาชนในพื้นที่.
-        </p>
-        <p className="text-gray-500 text-[11px]">
-          คำเตือน: ข้อมูลนี้เป็นระบบสนับสนุนการตัดสินใจเบื้องต้น ไม่ได้รับรองความปลอดภัย 100% ในทุกเส้นทาง กรุณาปฏิบัติตามคำสั่งของเจ้าหน้าที่กู้ภัยและศูนย์ความปลอดภัย สจล. ในภาวะฉุกเฉิน.
-        </p>
+
+        {/* HUMAN-READABLE "WHAT IS HAPPENING NOW" SECTION */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <h2 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-tight font-mono">
+                What is happening now (สถานการณ์ปัจจุบัน)
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500">
+              Operational Intelligence Synthesis
+            </span>
+          </div>
+
+          <div className="space-y-2.5">
+            {situationNarrative.map((text, idx) => (
+              <div key={idx} className="flex items-start gap-3 text-sm text-slate-700 dark:text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400 mt-2 shrink-0" />
+                <span className="leading-relaxed">{text}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Quick Actions Row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <Link
+              href="/report"
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs uppercase shadow-sm transition-colors"
+            >
+              <FileWarning className="w-4 h-4 text-white" />
+              <span>Report Flood</span>
+            </Link>
+
+            <Link
+              href="/route"
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase shadow-sm transition-colors"
+            >
+              <Navigation className="w-4 h-4 text-white" />
+              <span>Evaluate Route</span>
+            </Link>
+
+            <Link
+              href="/shelters"
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase shadow-sm transition-colors"
+            >
+              <Building className="w-4 h-4 text-white" />
+              <span>Shelters & Aid</span>
+            </Link>
+
+            <Link
+              href="/help"
+              className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase shadow-sm transition-colors"
+            >
+              <LifeBuoy className="w-4 h-4 text-white" />
+              <span>Request SOS</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* OPERATIONAL DATA PROVENANCE & TRANSPARENCY AUDIT */}
+        <div className="bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              <ShieldCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span>Operational Data Provenance & Safety Constraints</span>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500">
+              ISO/IEC 25012 Data Quality Standard
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+            <div className="space-y-1">
+              <span className="text-slate-500 block">generated_at:</span>
+              <span className="text-slate-900 dark:text-slate-100 font-bold" suppressHydrationWarning>
+                {summary?.last_updated || (mounted ? lastRefreshed.toISOString() : "Synchronizing stream...")}
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-slate-500 block">data_cutoff:</span>
+              <span className="text-slate-900 dark:text-slate-100 font-bold">
+                Citizen Reports: 120m • Satellite SAR: 24h
+              </span>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-slate-500 block">confidence:</span>
+              <span className="text-slate-900 dark:text-slate-100 font-bold">
+                {summary?.data_quality || "MEDIUM"} (Corroborated by DBSCAN)
+              </span>
+            </div>
+          </div>
+
+          {/* Sources and Unknown Segments Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 text-xs">
+            <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+              <span className="font-bold text-slate-900 dark:text-slate-100 block font-mono text-[11px] uppercase">
+                Active Sources & Integration Status:
+              </span>
+              <ul className="space-y-1 text-slate-600 dark:text-slate-300 font-mono text-[11px]">
+                <li className="flex items-center justify-between">
+                  <span>• Citizen Field Reports</span>
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">LIVE</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span>• Copernicus Sentinel-1 SAR</span>
+                  <span className="text-purple-700 dark:text-purple-400 font-bold">OBSERVATION</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span>• TMD Weather Radar</span>
+                  <span className="text-amber-700 dark:text-amber-400 font-bold">PENDING_ACCESS</span>
+                </li>
+                <li className="flex items-center justify-between">
+                  <span>• BMA DDS Canal Telemetry</span>
+                  <span className="text-amber-700 dark:text-amber-400 font-bold">PENDING_ACCESS</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+              <span className="font-bold text-slate-900 dark:text-slate-100 block font-mono text-[11px] uppercase text-amber-800 dark:text-amber-400">
+                Unknown Data Disclosures & Safety Boundaries:
+              </span>
+              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                เส้นทางและพื้นที่ที่ไม่มีการรายงานไม่ได้หมายความว่าปราศจากน้ำท่วม 100% (No Safe Guarantee). ภาพถ่ายดาวเทียมเป็นข้อมูลสังเกตการณ์ในอดีต (OBSERVATION) ไม่ใช่ข้อมูลความลึกถนนตามเวลาจริง. ระบบ SOS บนเว็บเป็นระบบทดสอบนำร่อง (PILOT_TEST) หากมีภัยคุกคามชีวิตโปรดโทร 199 หรือ 1669 ทันที.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );

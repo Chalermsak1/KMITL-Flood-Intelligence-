@@ -125,20 +125,45 @@ html:not(.dark) .bg-primary-600\/15 {
 /* Maintain crisp white text on solid colored buttons & SOS tags */
 html:not(.dark) a.bg-red-600,
 html:not(.dark) button.bg-red-600,
+html:not(.dark) a.bg-red-500,
+html:not(.dark) button.bg-red-500,
 html:not(.dark) a.bg-primary-600,
 html:not(.dark) button.bg-primary-600,
+html:not(.dark) a.bg-blue-600,
+html:not(.dark) button.bg-blue-600,
+html:not(.dark) a.bg-emerald-600,
+html:not(.dark) button.bg-emerald-600,
 html:not(.dark) .bg-red-600,
+html:not(.dark) .bg-red-500,
 html:not(.dark) .bg-primary-600,
+html:not(.dark) .bg-blue-600,
 html:not(.dark) .bg-emerald-600,
 html:not(.dark) .bg-cyan-600,
-html:not(.dark) .bg-orange-600 {
+html:not(.dark) .bg-orange-600,
+html:not(.dark) .bg-slate-900,
+html:not(.dark) .bg-slate-800,
+html:not(.dark) .btn-solid-white {
   color: #ffffff !important;
 }
 
 html:not(.dark) a.bg-red-600 *,
 html:not(.dark) button.bg-red-600 *,
+html:not(.dark) a.bg-red-500 *,
+html:not(.dark) button.bg-red-500 *,
 html:not(.dark) a.bg-primary-600 *,
-html:not(.dark) button.bg-primary-600 * {
+html:not(.dark) button.bg-primary-600 *,
+html:not(.dark) a.bg-blue-600 *,
+html:not(.dark) button.bg-blue-600 *,
+html:not(.dark) .bg-red-600 *,
+html:not(.dark) .bg-red-500 *,
+html:not(.dark) .bg-primary-600 *,
+html:not(.dark) .bg-blue-600 *,
+html:not(.dark) .bg-emerald-600 *,
+html:not(.dark) .bg-cyan-600 *,
+html:not(.dark) .bg-orange-600 *,
+html:not(.dark) .bg-slate-900 *,
+html:not(.dark) .bg-slate-800 *,
+html:not(.dark) .btn-solid-white * {
   color: #ffffff !important;
 }
 

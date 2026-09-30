@@ -16,29 +16,34 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({
 }) => {
   const config = {
     LOW: {
-      color: "bg-emerald-500/10 text-emerald-400 border-emerald-500/40",
-      dot: "bg-emerald-400",
+      color: "bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-500/40",
+      dot: "bg-emerald-600 dark:bg-emerald-400",
       label: "LOW RISK"
     },
+    MEDIUM: {
+      color: "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-500/40",
+      dot: "bg-amber-500 dark:bg-amber-400",
+      label: "MEDIUM RISK"
+    },
     MODERATE: {
-      color: "bg-amber-500/10 text-amber-400 border-amber-500/40",
-      dot: "bg-amber-400",
+      color: "bg-amber-50 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-500/40",
+      dot: "bg-amber-500 dark:bg-amber-400",
       label: "MODERATE"
     },
     HIGH: {
-      color: "bg-orange-500/10 text-orange-400 border-orange-500/40",
-      dot: "bg-orange-400",
+      color: "bg-orange-50 text-orange-800 border-orange-300 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-500/40",
+      dot: "bg-orange-600 dark:bg-orange-400",
       label: "HIGH FLOOD RISK"
     },
     CRITICAL: {
-      color: "bg-red-500/15 text-red-400 border-red-500/50",
-      dot: "bg-red-500 animate-ping",
+      color: "bg-red-50 text-red-800 border-red-300 dark:bg-red-950/40 dark:text-red-300 dark:border-red-500/40 font-bold",
+      dot: "bg-red-600 dark:bg-red-500 animate-ping",
       label: "CRITICAL DANGER"
     },
     UNKNOWN: {
-      color: "bg-gray-500/10 text-gray-400 border-gray-500/30",
-      dot: "bg-gray-400",
-      label: "INSUFFICIENT DATA"
+      color: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800/40 dark:text-slate-300 dark:border-slate-600",
+      dot: "bg-slate-500 dark:bg-slate-400",
+      label: "UNKNOWN / INSUFFICIENT"
     }
   };
 

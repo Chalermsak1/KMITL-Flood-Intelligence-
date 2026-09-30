@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Header } from "../components/common/Header";
+import { MobileBottomNav } from "../components/common/MobileBottomNav";
 
 export const metadata: Metadata = {
   title: "KMITL Flood Intelligence | Real-Time Situational Awareness",
@@ -25,7 +26,12 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                if (localStorage.getItem('kmitl_theme') === 'dark') {
+                var theme = localStorage.getItem('kmitl_theme_v2');
+                if (!theme) {
+                  try { localStorage.removeItem('kmitl_theme'); } catch (_) {}
+                  try { localStorage.setItem('kmitl_theme_v2', 'light'); } catch (_) {}
+                  document.documentElement.classList.remove('dark');
+                } else if (theme === 'dark') {
                   document.documentElement.classList.add('dark');
                 } else {
                   document.documentElement.classList.remove('dark');
@@ -35,9 +41,10 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen flex flex-col bg-background text-gray-900 dark:text-gray-100 antialiased selection:bg-primary-500 selection:text-white">
+      <body className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
         <Header />
-        <main className="flex-1 flex flex-col">{children}</main>
+        <main className="flex-1 flex flex-col pb-16 sm:pb-0">{children}</main>
+        <MobileBottomNav />
       </body>
     </html>
   );

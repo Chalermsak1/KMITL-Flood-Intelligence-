@@ -1,7 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { getApiBase } from "../lib/api";
 import { WebSocketEvent } from "../lib/types";
+
+function getWsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return process.env.NEXT_PUBLIC_WS_URL;
+  }
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "ws://localhost:8000/ws/live";
+    }
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}/ws/live`;
+  }
+  return "ws://localhost:8000/ws/live";
+}
+
 
 interface UseWebSocketOptions {
   onEvent?: (event: WebSocketEvent) => void;
@@ -58,7 +74,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       return;
     }
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
+    const apiBase = getApiBase();
     try {
       if (sseRef.current) {
         sseRef.current.close();
@@ -103,7 +119,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const connect = useCallback(() => {
     if (unmountedRef.current || typeof window === "undefined") return;
 
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8001/ws/live";
+    const wsUrl = getWsUrl();
+
     try {
       if (wsRef.current) {
         const oldWs = wsRef.current;

@@ -18,73 +18,93 @@ OSM_LAT_KRABANG_SEGMENTS = [
         "name": "Thanon Chalong Krung (North - Industrial Estate)",
         "road_type": "PRIMARY",
         "coordinates": [
-            [100.7780, 13.7380],
-            [100.7810, 13.7480],
-            [100.7830, 13.7550]
+            [100.7844, 13.7324],
+            [100.7859, 13.7339],
+            [100.7877, 13.7358],
+            [100.7898, 13.7380],
+            [100.7913, 13.7409],
+            [100.7931, 13.7465],
+            [100.7942, 13.7501],
+            [100.7965, 13.7534],
+            [100.7988, 13.7569]
         ],
-        "length_km": 2.1,
-        "base_minutes": 4.5
+        "length_km": 3.2,
+        "base_minutes": 5.0
     },
     {
         "id": "SEG_CHALONG_KRUNG_CAMPUS",
         "name": "Thanon Chalong Krung (KMITL Main Frontage)",
         "road_type": "PRIMARY",
         "coordinates": [
-            [100.7750, 13.7270],
-            [100.7780, 13.7300],
-            [100.7780, 13.7380]
+            [100.7802, 13.7220],
+            [100.7802, 13.7245],
+            [100.7782, 13.7248],
+            [100.7781, 13.7272],
+            [100.7781, 13.7285],
+            [100.7782, 13.7294],
+            [100.7789, 13.7301],
+            [100.7803, 13.7304],
+            [100.7821, 13.7305],
+            [100.7840, 13.7309],
+            [100.7844, 13.7324]
         ],
-        "length_km": 1.4,
-        "base_minutes": 3.0
+        "length_km": 1.9,
+        "base_minutes": 3.5
     },
     {
         "id": "SEG_LAT_KRABANG_W",
         "name": "Thanon Lat Krabang (West toward Rom Klao)",
         "road_type": "PRIMARY",
         "coordinates": [
-            [100.7500, 13.7210],
-            [100.7650, 13.7230],
-            [100.7750, 13.7270]
+            [100.7483, 13.7210],
+            [100.7580, 13.7214],
+            [100.7666, 13.7217],
+            [100.7750, 13.7219],
+            [100.7802, 13.7220]
         ],
-        "length_km": 2.8,
-        "base_minutes": 5.5
+        "length_km": 3.6,
+        "base_minutes": 6.0
     },
     {
         "id": "SEG_LAT_KRABANG_E",
         "name": "Thanon Luang Phaeng / Hua Takhe",
         "road_type": "SECONDARY",
         "coordinates": [
-            [100.7750, 13.7270],
-            [100.7890, 13.7220],
-            [100.8020, 13.7180]
+            [100.7802, 13.7220],
+            [100.7895, 13.7215],
+            [100.7935, 13.7208],
+            [100.8050, 13.7180]
         ],
-        "length_km": 3.1,
-        "base_minutes": 6.0
+        "length_km": 2.8,
+        "base_minutes": 5.0
     },
     {
         "id": "SEG_KMITL_ENGINEERING_LOOP",
         "name": "KMITL Inner Campus Rd (Engineering & Library)",
         "road_type": "TERTIARY",
         "coordinates": [
-            [100.7750, 13.7270],
-            [100.7740, 13.7300],
-            [100.7710, 13.7320],
-            [100.7740, 13.7350],
-            [100.7780, 13.7380]
+            [100.7781, 13.7281],
+            [100.7765, 13.7280],
+            [100.7749, 13.7280],
+            [100.7719, 13.7271],
+            [100.7710, 13.7285],
+            [100.7735, 13.7295],
+            [100.7781, 13.7298]
         ],
-        "length_km": 1.8,
-        "base_minutes": 4.0
+        "length_km": 1.6,
+        "base_minutes": 3.5
     },
     {
         "id": "SEG_MOTORWAY_FRONTAGE",
         "name": "Highway 7 Motorway Parallel Frontage Rd",
         "road_type": "SECONDARY",
         "coordinates": [
-            [100.7550, 13.7150],
-            [100.7700, 13.7160],
-            [100.7850, 13.7170]
+            [100.7550, 13.7317],
+            [100.7700, 13.7320],
+            [100.7844, 13.7324],
+            [100.7930, 13.7328]
         ],
-        "length_km": 3.4,
+        "length_km": 4.1,
         "base_minutes": 6.5
     }
 ]

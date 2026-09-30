@@ -17,8 +17,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -54,6 +54,13 @@ yarn-error.log*
 .vscode/
 *.swp
 *.swo
+
+# Binaries & local tools
+bin/
+*.exe
+
+# TypeScript build cache
+*.tsbuildinfo
 
 # Docker
 *.docker.log

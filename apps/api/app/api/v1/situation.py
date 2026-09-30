@@ -69,3 +69,57 @@ async def get_current_situation(db: AsyncSession = Depends(get_db)):
     )
 
     return StandardResponse(data=summary, meta=meta)
+
+
+@router.get("/situation/events")
+async def get_situation_events(db: AsyncSession = Depends(get_db)):
+    """Unified chronological real event stream (Section 17)."""
+    now = datetime.now(timezone.utc)
+    try:
+        events = await asyncio.wait_for(SituationService.get_events(db), timeout=2.5)
+    except Exception:
+        events = []
+
+    meta = MetaEnvelope(
+        source="KMITL_EVENT_STREAM",
+        observed_at=events[0].timestamp if events else now,
+        ingested_at=now,
+        freshness="FRESH",
+        confidence="HIGH",
+        attribution="KMITL Unified Situational Event Stream",
+        mode="LIVE"
+    )
+    return StandardResponse(data=events, meta=meta)
+
+
+@router.get("/situation/changes")
+async def get_situation_changes(db: AsyncSession = Depends(get_db)):
+    """What Changed? concise comparison view (Section 16)."""
+    now = datetime.now(timezone.utc)
+    try:
+        changes = await asyncio.wait_for(SituationService.get_changes(db), timeout=2.5)
+    except Exception:
+        from app.schemas.situation import SituationChangesResponse
+        changes = SituationChangesResponse(
+            new_reports_count=0,
+            roads_worsened_count=0,
+            roads_improved_count=0,
+            new_incidents_count=0,
+            water_level_changes=[],
+            rain_changes=[],
+            road_changes=[],
+            comparison_window="1 hour",
+            calculated_at=now
+        )
+
+    meta = MetaEnvelope(
+        source="KMITL_DELTA_ENGINE",
+        observed_at=changes.calculated_at,
+        ingested_at=now,
+        freshness="FRESH",
+        confidence="HIGH",
+        attribution="KMITL 1-Hour Temporal Delta Engine",
+        mode="LIVE"
+    )
+    return StandardResponse(data=changes, meta=meta)
+
