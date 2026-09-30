@@ -229,21 +229,23 @@ class SituationService:
 
         # 4. Flooded Road Segments
         try:
-            from app.services.road_network import evaluate_roads
-            current_roads = evaluate_roads("NOW")
-            for feat in current_roads.get("features", []):
-                p = feat.get("properties", {})
-                if p.get("status") in ["FLOODED", "SEVERELY_FLOODED", "BLOCKED"]:
+            from app.services.road_network import RoadNetworkService
+            current_road_features = RoadNetworkService.evaluate_roads(
+                active_reports=[], all_reports_history=[], active_incidents=[], time_offset="NOW"
+            )
+            for feat in current_road_features:
+                p = feat.properties
+                if p.status in ["FLOODED", "SEVERELY_FLOODED", "BLOCKED"]:
                     events.append(
                         SituationEventItem(
-                            id=f"EVT_ROAD_{p.get('road_segment_id')}",
+                            id=f"EVT_ROAD_{p.road_segment_id}",
                             timestamp=now - timedelta(minutes=15),
-                            location=p.get("road_name", "Road Segment"),
+                            location=p.road_name,
                             event_type="ROAD_STATUS",
                             source="Spatial Road Network Evaluation",
                             status="ESTIMATED",
-                            description=f"{p.get('road_name')}: {p.get('status')} ({p.get('water_depth_cm')} cm) - {p.get('flow_direction')}",
-                            details={"status": p.get("status"), "depth_cm": p.get("water_depth_cm")}
+                            description=f"{p.road_name}: {p.status} - {p.flow_direction}",
+                            details={"status": p.status, "depth_cm": p.water_depth_cm}
                         )
                     )
         except Exception:
@@ -280,9 +282,9 @@ class SituationService:
             pass
 
         # 3. Compare road statuses between NOW and 1H_AGO
-        from app.services.road_network import evaluate_roads
-        roads_now = {f["properties"]["road_segment_id"]: f["properties"] for f in evaluate_roads("NOW").get("features", [])}
-        roads_1h = {f["properties"]["road_segment_id"]: f["properties"] for f in evaluate_roads("1H_AGO").get("features", [])}
+        from app.services.road_network import RoadNetworkService
+        roads_now = {f.properties.road_segment_id: f.properties for f in RoadNetworkService.evaluate_roads(active_reports=[], all_reports_history=[], active_incidents=[], time_offset="NOW")}
+        roads_1h = {f.properties.road_segment_id: f.properties for f in RoadNetworkService.evaluate_roads(active_reports=[], all_reports_history=[], active_incidents=[], time_offset="1H_AGO")}
 
         worsened = 0
         improved = 0
@@ -301,21 +303,22 @@ class SituationService:
             if not prev_p:
                 continue
 
-            status_now = now_p.get("status", "NO_EVIDENCE")
-            status_prev = prev_p.get("status", "NO_EVIDENCE")
+            status_now = now_p.status if hasattr(now_p, "status") else now_p.get("status", "NO_EVIDENCE")
+            status_prev = prev_p.status if hasattr(prev_p, "status") else prev_p.get("status", "NO_EVIDENCE")
 
             rank_now = severity_rank.get(status_now, 0)
             rank_prev = severity_rank.get(status_prev, 0)
 
-            depth_now = now_p.get("water_depth_cm")
-            depth_prev = prev_p.get("water_depth_cm")
+            depth_now = now_p.water_depth_cm if hasattr(now_p, "water_depth_cm") else now_p.get("water_depth_cm")
+            depth_prev = prev_p.water_depth_cm if hasattr(prev_p, "water_depth_cm") else prev_p.get("water_depth_cm")
             depth_delta = (depth_now - depth_prev) if (depth_now is not None and depth_prev is not None) else None
+            road_name_now = now_p.road_name if hasattr(now_p, "road_name") else now_p.get("road_name", seg_id)
 
             if rank_now > rank_prev:
                 worsened += 1
                 road_changes.append(
                     RoadStateChange(
-                        road_name=now_p.get("road_name", seg_id),
+                        road_name=road_name_now,
                         segment_id=seg_id,
                         previous_status=status_prev,
                         current_status=status_now,
@@ -327,7 +330,7 @@ class SituationService:
                 improved += 1
                 road_changes.append(
                     RoadStateChange(
-                        road_name=now_p.get("road_name", seg_id),
+                        road_name=road_name_now,
                         segment_id=seg_id,
                         previous_status=status_prev,
                         current_status=status_now,

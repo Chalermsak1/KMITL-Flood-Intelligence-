@@ -582,6 +582,7 @@ class RoadNetworkService:
                 flow_story = "Water movement cannot currently be determined from available observations."
                 flow_path_steps = []
                 flow_path_coordinates = []
+                flow_path_coords = []  # alias so shared assignment below works
                 flow_explanation = {
                     "evidence_based_on": [],
                     "missing_evidence": [

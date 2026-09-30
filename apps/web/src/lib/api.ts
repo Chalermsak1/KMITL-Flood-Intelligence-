@@ -1,6 +1,8 @@
 import {
   StandardResponse,
   SituationSummary,
+  SituationEventItem,
+  SituationChangesResponse,
   Incident,
   FloodReport,
   WaterStation,
@@ -50,6 +52,8 @@ async function fetchJSON<T>(path: string): Promise<StandardResponse<T>> {
 
 export const api = {
   getSituationSummary: () => fetchJSON<SituationSummary>("/api/v1/situation/summary"),
+  getSituationEvents: () => fetchJSON<SituationEventItem[]>("/api/v1/situation/events"),
+  getSituationChanges: () => fetchJSON<SituationChangesResponse>("/api/v1/situation/changes"),
   getIncidents: (bbox?: string) => fetchJSON<Incident[]>(bbox ? `/api/v1/incidents?bbox=${bbox}` : "/api/v1/incidents"),
   getReports: (bbox?: string) => fetchJSON<FloodReport[]>(bbox ? `/api/v1/reports?bbox=${bbox}` : "/api/v1/reports"),
   getWaterStations: () => fetchJSON<WaterStation[]>("/api/v1/water-stations"),

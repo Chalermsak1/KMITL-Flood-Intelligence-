@@ -320,6 +320,38 @@ export interface DrainageCollectionResponse {
   features: DrainageFeature[];
 }
 
+export interface SituationEventItem {
+  id: string;
+  timestamp: string;
+  location: string;
+  event_type: "CITIZEN_REPORT" | "VERIFIED_INCIDENT" | "WATER_LEVEL" | "ROAD_STATUS" | "RAINFALL" | string;
+  source: string;
+  status: "REPORTED" | "VERIFIED" | "OBSERVED" | "ESTIMATED" | "STALE" | string;
+  description: string;
+  details?: Record<string, any>;
+}
+
+export interface RoadStateChange {
+  road_name: string;
+  segment_id: string;
+  previous_status: string;
+  current_status: string;
+  change_type: "WORSENED" | "IMPROVED";
+  depth_delta_cm?: number | null;
+}
+
+export interface SituationChangesResponse {
+  new_reports_count: number;
+  roads_worsened_count: number;
+  roads_improved_count: number;
+  new_incidents_count: number;
+  water_level_changes: string[];
+  rain_changes: string[];
+  road_changes: RoadStateChange[];
+  comparison_window: string;
+  calculated_at: string;
+}
+
 export interface SelectedFeature {
   type: "INCIDENT" | "CITIZEN_REPORT" | "WATER_STATION" | "SHELTER" | "SATELLITE" | "ROAD_SEGMENT" | "DRAINAGE";
   title: string;
