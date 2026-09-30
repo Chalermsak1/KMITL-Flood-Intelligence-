@@ -71,7 +71,7 @@ $$\text{Flood Intelligence} = \text{Data Fusion} + \text{Real-Time Signals} + \t
 ### Live Geospatial Operations Command Map
 WebGL GPU-accelerated interactive vector map rendering real-time road segment exposure (Safe, Ponding, Impassable), canal gauge water stages, citizen incident markers, and a 24-hour temporal evolution timeline scrubber.
 
-![KMITL Flood Intelligence Live Map Dashboard](docs/images/flood_map_dashboard.jpg)
+![KMITL Flood Intelligence Live Map Dashboard](docs/images/flood_map_dashboard.png)
 
 ---
 
