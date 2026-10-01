@@ -19,37 +19,12 @@ import {
 
 export type MapDisplayMode = "FLOOD_CONDITION" | "WATER_MOVEMENT";
 
-const getBaseMapStyle = (highContrast: boolean): maplibregl.StyleSpecification => {
-  const apiBase = typeof window !== "undefined"
-    ? (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1" ? "" : (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"))
-    : "http://localhost:8000";
-
-  return {
-    version: 8,
-    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-    sources: {
-      "base-raster": {
-        type: "raster",
-        tiles: [
-          `${apiBase}/api/v1/tiles/{z}/{x}/{y}.png`
-        ],
-        tileSize: 256,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }
-    },
-    layers: [
-      {
-        id: "base-raster-layer",
-        type: "raster",
-        source: "base-raster",
-        minzoom: 0,
-        maxzoom: 19,
-        paint: {
-          "raster-opacity": highContrast ? 0.82 : 0.95
-        }
-      }
-    ]
-  };
+const getBaseMapStyle = (highContrast: boolean): string | maplibregl.StyleSpecification => {
+  // Authoritative CARTO Vector GL basemaps (EPSG:4326/EPSG:3857 OpenStreetMap vector tiles)
+  // Ensures sub-pixel GIS accuracy and eliminates raster pixel stretching/shifting.
+  return highContrast
+    ? "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+    : "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 };
 
 
@@ -350,6 +325,29 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         }
       });
 
+      // Directional Water Flow Arrows along roads (Section 12: Directional Indicators)
+      map.addLayer({
+        id: "roads-flow-arrows",
+        type: "symbol",
+        source: "roads-network",
+        filter: ["in", ["get", "flow_status"], ["literal", ["ESTIMATED", "OBSERVED"]]],
+        layout: {
+          visibility: layers.waterFlow ? "visible" : "none",
+          "symbol-placement": "line",
+          "symbol-spacing": 75,
+          "text-field": "▶",
+          "text-size": 13,
+          "text-keep-upright": false,
+          "text-allow-overlap": true,
+          "text-ignore-placement": true
+        },
+        paint: {
+          "text-color": "#0284c7",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 2
+        }
+      });
+
       // Water Depth Label Layer (Section 9)
       map.addLayer({
         id: "roads-depth-label",
@@ -640,6 +638,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
       map.setLayoutProperty("roads-casing", "visibility", layers.floodStatus ? "visible" : "none");
       map.setLayoutProperty("roads-line", "visibility", layers.floodStatus ? "visible" : "none");
       map.setLayoutProperty("roads-flow", "visibility", layers.waterFlow ? "visible" : "none");
+      map.setLayoutProperty("roads-flow-arrows", "visibility", layers.waterFlow ? "visible" : "none");
       map.setLayoutProperty("roads-depth-label", "visibility", layers.waterDepth ? "visible" : "none");
       map.setLayoutProperty("roads-trend-label", "visibility", layers.floodTrend ? "visible" : "none");
       map.setLayoutProperty("drainage-canals-casing", "visibility", layers.drainage ? "visible" : "none");
@@ -716,6 +715,51 @@ export const FloodMap: React.FC<FloodMapProps> = ({
     }
 
     if (!activeTraceRoad || !activeTraceRoad.flow_path_coordinates || activeTraceRoad.flow_path_coordinates.length < 2) {
+      // If no single road is actively selected, but in WATER_MOVEMENT mode or waterFlow layer is active:
+      // Show overall flow pathways for all road segments with ESTIMATED flow data
+      if ((mapMode === "WATER_MOVEMENT" || layers.waterFlow) && roads?.features) {
+        const flowFeatures: any[] = [];
+        const flowNodes: any[] = [];
+        roads.features.forEach((f) => {
+          const props = f.properties;
+          if (props.flow_status === "ESTIMATED" || props.flow_status === "OBSERVED") {
+            const rawCoords = props.flow_path_coordinates || f.geometry.coordinates;
+            const parsedCoords = typeof rawCoords === "string" ? JSON.parse(rawCoords) : rawCoords;
+            if (Array.isArray(parsedCoords) && parsedCoords.length >= 2) {
+              flowFeatures.push({
+                type: "Feature",
+                geometry: { type: "LineString", coordinates: parsedCoords },
+                properties: { road_id: props.road_segment_id, flow_status: props.flow_status }
+              });
+            }
+            if (props.flow_path_steps) {
+              const steps = typeof props.flow_path_steps === "string" ? JSON.parse(props.flow_path_steps) : props.flow_path_steps;
+              if (Array.isArray(steps)) {
+                steps.forEach((st: any) => {
+                  if (st.coordinates && Array.isArray(st.coordinates) && st.coordinates.length === 2) {
+                    flowNodes.push({
+                      type: "Feature",
+                      geometry: { type: "Point", coordinates: st.coordinates },
+                      properties: { name: st.name, type: st.type, status: st.status }
+                    });
+                  }
+                });
+              }
+            }
+          }
+        });
+
+        if (flowFeatures.length > 0) {
+          if (pathSource) pathSource.setData({ type: "FeatureCollection", features: flowFeatures });
+          if (nodesSource) nodesSource.setData({ type: "FeatureCollection", features: flowNodes });
+          if (particlesSource) particlesSource.setData({ type: "FeatureCollection", features: [] });
+          try {
+            map.setLayoutProperty("flow-trace-static-arrows", "visibility", "visible");
+          } catch {}
+          return;
+        }
+      }
+
       // Clear flow trace
       if (pathSource) pathSource.setData({ type: "FeatureCollection", features: [] });
       if (nodesSource) nodesSource.setData({ type: "FeatureCollection", features: [] });
@@ -845,7 +889,7 @@ export const FloodMap: React.FC<FloodMapProps> = ({
         animFrameRef.current = null;
       }
     };
-  }, [activeTraceRoad, isMapLoaded]);
+  }, [activeTraceRoad, mapMode, layers.waterFlow, roads, isMapLoaded]);
 
   // Smooth pan to target coordinate when requested
   useEffect(() => {

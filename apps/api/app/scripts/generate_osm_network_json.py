@@ -235,7 +235,11 @@ def generate_network_data():
         }
     }
 
-    out_path = '/app/app/data/real_osm_network.json'
+    import os
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+    out_path = os.path.join(data_dir, "real_osm_network.json")
+    if not os.path.exists(data_dir) and os.path.exists("/app/app/data"):
+        out_path = "/app/app/data/real_osm_network.json"
     with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     print(f"Successfully generated {out_path} with {len(data['corridors'])} corridors and {len(data['drainage'])} drainage features.")

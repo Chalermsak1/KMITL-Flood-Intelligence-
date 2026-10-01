@@ -55,6 +55,7 @@ import { RoadCollectionResponse, RoadProperties, DrainageCollectionResponse } fr
 import { useWebSocket } from "../hooks/useWebSocket";
 import { useLocationContext } from "../hooks/useLocationContext";
 import { LocationContextBar } from "../components/location/LocationContextBar";
+import type { MapDisplayMode } from "../components/map/FloodMap";
 import clsx from "clsx";
 
 const FloodMap = dynamic(
@@ -114,6 +115,8 @@ export default function HomePage() {
 
   // UI state
   const [loading, setLoading] = useState(true);
+  const [mapMode, setMapMode] = useState<MapDisplayMode>("FLOOD_CONDITION");
+  const [activeTraceRoad, setActiveTraceRoad] = useState<RoadProperties | null>(null);
   const [isDegraded, setIsDegraded] = useState(false);
   const [degradedMessage, setDegradedMessage] = useState<string | null>(null);
   const [selectedFeature, setSelectedFeature] = useState<SelectedFeature | null>(null);
@@ -425,6 +428,8 @@ export default function HomePage() {
           gpsLoading={gpsLoading}
           onSelectFeature={handleSelectFeature}
           onSelectRoad={handleSelectRoad}
+          mapMode={mapMode}
+          activeTraceRoad={activeTraceRoad}
           className="w-full h-full"
         />
 
@@ -476,12 +481,65 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* TIME EVOLUTION CONTROL (Section 11) - Desktop centered, Mobile/Tablet second row */}
-        <div className="absolute top-14 left-3 lg:top-3 lg:left-1/2 lg:-translate-x-1/2 z-20 max-w-[calc(100vw-1.5rem)]">
-          <TimeEvolutionControl
-            activeOffset={timeOffset}
-            onChange={handleTimeOffsetChange}
-          />
+        {/* CENTER-TOP: MAP MODE SWITCHER & TIME CONTROL */}
+        <div className="absolute top-14 left-3 lg:top-3 lg:left-1/2 lg:-translate-x-1/2 z-20 flex flex-col items-center gap-1.5 max-w-[calc(100vw-1.5rem)] pointer-events-none">
+          {/* Map Display Mode Pill: FLOOD CONDITION vs WATER MOVEMENT */}
+          <div className="pointer-events-auto flex items-center bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-md gap-1">
+            <button
+              type="button"
+              onClick={() => setMapMode("FLOOD_CONDITION")}
+              className={clsx(
+                "px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5",
+                mapMode === "FLOOD_CONDITION"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+              )}
+            >
+              <span>🌊</span>
+              <span>FLOOD CONDITION</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMapMode("WATER_MOVEMENT");
+                if (!layers.waterFlow) {
+                  setLayers((prev) => ({ ...prev, waterFlow: true }));
+                }
+              }}
+              className={clsx(
+                "px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all flex items-center gap-1.5",
+                mapMode === "WATER_MOVEMENT"
+                  ? "bg-cyan-600 text-white shadow-sm shadow-cyan-600/30"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+              )}
+            >
+              <span>➔</span>
+              <span>WATER MOVEMENT (ทิศทางน้ำ)</span>
+            </button>
+          </div>
+
+          <div className="pointer-events-auto">
+            <TimeEvolutionControl
+              activeOffset={timeOffset}
+              onChange={handleTimeOffsetChange}
+            />
+          </div>
+
+          {/* Active Flow Trace Indicator Chip */}
+          {activeTraceRoad && (
+            <div className="pointer-events-auto flex items-center gap-2 px-3 py-1 bg-cyan-900/95 text-cyan-100 backdrop-blur-md border border-cyan-400/60 rounded-full text-xs font-mono shadow-lg animate-pulse">
+              <Compass className="w-3.5 h-3.5 text-cyan-300 animate-spin" style={{ animationDuration: "6s" }} />
+              <span>Tracing: <strong>{activeTraceRoad.road_name || activeTraceRoad.road_segment_id}</strong></span>
+              <button
+                type="button"
+                onClick={() => setActiveTraceRoad(null)}
+                className="ml-1 text-cyan-300 hover:text-white hover:bg-cyan-800/80 rounded-full w-4 h-4 flex items-center justify-center font-bold"
+                title="Clear Trace"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
 
         {/* TOP-RIGHT: COLLAPSIBLE MAP LAYER CONTROL */}
@@ -574,6 +632,15 @@ export default function HomePage() {
             <RoadDetailPanel
               road={selectedRoad}
               onClose={() => setSelectedRoad(null)}
+              onFollowWaterMovement={(road) => {
+                setMapMode("WATER_MOVEMENT");
+                setActiveTraceRoad(road);
+                if (!layers.waterFlow) {
+                  setLayers((prev) => ({ ...prev, waterFlow: true }));
+                }
+              }}
+              onClearTrace={() => setActiveTraceRoad(null)}
+              isTracing={activeTraceRoad?.road_segment_id === selectedRoad.road_segment_id}
             />
           </div>
         ) : selectedFeature ? (

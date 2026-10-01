@@ -6,8 +6,12 @@ from shapely.geometry import LineString, MultiLineString, Point, mapping
 from shapely.ops import linemerge, unary_union
 
 def extract_osm_data():
-    files = sorted(glob.glob('/app/app/data/osm_raw/osm_cell*.xml'))
-    print(f"Reading {len(files)} OSM XML files...")
+    import os
+    raw_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "osm_raw")
+    if not os.path.exists(raw_dir):
+        raw_dir = "/app/app/data/osm_raw"
+    files = sorted(glob.glob(os.path.join(raw_dir, "osm_cell*.xml")))
+    print(f"Reading {len(files)} OSM XML files from {raw_dir}...")
     
     nodes: Dict[str, Tuple[float, float]] = {}
     highways: List[Dict] = []
