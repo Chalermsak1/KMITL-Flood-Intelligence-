@@ -24,11 +24,16 @@ import {
   Layers,
   Compass,
   AlertCircle,
-  Building
+  Building,
+  TrendingUp,
+  TrendingDown,
+  Activity
 } from "lucide-react";
 import { api } from "../lib/api";
 import {
   SituationSummary,
+  SituationEventItem,
+  SituationChangesResponse,
   Incident,
   FloodReport,
   WaterStation,
@@ -104,6 +109,8 @@ export default function HomePage() {
   const [satellite, setSatellite] = useState<SatelliteObservation | null>(null);
   const [roads, setRoads] = useState<RoadCollectionResponse | null>(null);
   const [drainage, setDrainage] = useState<DrainageCollectionResponse | null>(null);
+  const [situationEvents, setSituationEvents] = useState<SituationEventItem[]>([]);
+  const [situationChanges, setSituationChanges] = useState<SituationChangesResponse | null>(null);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -262,6 +269,24 @@ export default function HomePage() {
     }
   }, [timeOffset]);
 
+  // Fetch live situation events and changes (separate, lighter poll)
+  const loadSituationFeed = useCallback(async () => {
+    try {
+      const [eventsRes, changesRes] = await Promise.allSettled([
+        api.getSituationEvents(),
+        api.getSituationChanges(),
+      ]);
+      if (eventsRes.status === "fulfilled" && eventsRes.value?.data && Array.isArray(eventsRes.value.data)) {
+        setSituationEvents(eventsRes.value.data);
+      }
+      if (changesRes.status === "fulfilled" && changesRes.value?.data) {
+        setSituationChanges(changesRes.value.data);
+      }
+    } catch {
+      // Silent — event feed is supplementary
+    }
+  }, []);
+
   // WebSocket Live Stream Handling
   const handleWsEvent = useCallback((event: WebSocketEvent) => {
     if (
@@ -271,16 +296,19 @@ export default function HomePage() {
       event.event === "RISK_CHANGED"
     ) {
       loadAllData();
+      loadSituationFeed();
     }
-  }, [loadAllData]);
+  }, [loadAllData, loadSituationFeed]);
 
   const { isConnected, transportMode } = useWebSocket({ onEvent: handleWsEvent });
 
   useEffect(() => {
     loadAllData();
+    loadSituationFeed();
     const interval = setInterval(loadAllData, 25000);
-    return () => clearInterval(interval);
-  }, [loadAllData]);
+    const feedInterval = setInterval(loadSituationFeed, 20000);
+    return () => { clearInterval(interval); clearInterval(feedInterval); };
+  }, [loadAllData, loadSituationFeed]);
 
   // Handle location search filtering / selection
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -665,6 +693,159 @@ export default function HomePage() {
               >
                 ARL
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* OPERATIONAL DYNAMICS: LIVE EVENT FEED & WHAT CHANGED (Sections 16 & 17) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* LIVE SITUATION EVENT FEED (Section 17-18: Real Events from DB) */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+                </span>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight font-mono">
+                  Live Event Feed
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                {situationEvents.length > 0 ? `${situationEvents.length} events · 20s poll` : "Polling DB..."}
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800 flex-1 max-h-[360px] overflow-y-auto">
+              {situationEvents.length === 0 ? (
+                <div className="px-6 py-12 text-center text-xs font-mono text-slate-400">
+                  No recent events recorded in the database.
+                </div>
+              ) : (
+                situationEvents.slice(0, 8).map((evt) => (
+                  <div key={evt.id} className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <span className={[
+                      "mt-0.5 text-[9px] font-bold font-mono px-1.5 py-0.5 rounded border shrink-0",
+                      evt.event_type === "CITIZEN_REPORT" ? "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300" :
+                      evt.event_type === "VERIFIED_INCIDENT" ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300" :
+                      evt.event_type === "WATER_LEVEL" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300" :
+                      evt.event_type === "ROAD_STATUS" ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300" :
+                      "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300"
+                    ].join(" ")}>
+                      {evt.event_type.replace(/_/g, " ")}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-snug">{evt.description}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] font-mono text-slate-400">{evt.location}</span>
+                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {new Date(evt.timestamp).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        <span className="text-slate-300 dark:text-slate-600">·</span>
+                        <span className={[
+                          "text-[10px] font-mono font-bold",
+                          evt.status === "VERIFIED" ? "text-emerald-600 dark:text-emerald-400" :
+                          evt.status === "REPORTED" ? "text-orange-600 dark:text-orange-400" :
+                          "text-slate-500"
+                        ].join(" ")}>{evt.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* WHAT CHANGED? DELTA ENGINE (Section 16) */}
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <Activity className="w-4 h-4 text-indigo-500" />
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-tight font-mono">
+                  What Changed ({situationChanges?.comparison_window || "1 hour"} window)
+                </h2>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                1-Hour Temporal Delta
+              </span>
+            </div>
+
+            {/* Quick Stat Pill Highlights */}
+            <div className="grid grid-cols-4 gap-2 p-4 bg-slate-50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 text-center">
+              <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white">
+                  {situationChanges?.new_reports_count ?? 0}
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">New Reports</div>
+              </div>
+              <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className={clsx(
+                  "text-lg font-bold font-mono",
+                  (situationChanges?.roads_worsened_count ?? 0) > 0 ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"
+                )}>
+                  {situationChanges?.roads_worsened_count ?? 0}
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">Worsened</div>
+              </div>
+              <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className={clsx(
+                  "text-lg font-bold font-mono",
+                  (situationChanges?.roads_improved_count ?? 0) > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-slate-900 dark:text-white"
+                )}>
+                  {situationChanges?.roads_improved_count ?? 0}
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">Improved</div>
+              </div>
+              <div className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white">
+                  {situationChanges?.new_incidents_count ?? 0}
+                </div>
+                <div className="text-[10px] font-mono text-slate-500 uppercase">Incidents</div>
+              </div>
+            </div>
+
+            {/* Road State Transitions and Hydrological Shifts */}
+            <div className="p-4 flex-1 max-h-[280px] overflow-y-auto space-y-3">
+              {(!situationChanges?.road_changes || situationChanges.road_changes.length === 0) &&
+               (!situationChanges?.water_level_changes || situationChanges.water_level_changes.length === 0) ? (
+                <div className="py-8 text-center text-xs font-mono text-slate-400">
+                  No state transitions recorded in this comparison window. Road passability and canal levels remain consistent.
+                </div>
+              ) : (
+                <>
+                  {situationChanges?.road_changes?.map((rc, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs">
+                      <div className="flex items-center gap-2">
+                        {rc.change_type === "WORSENED" ? (
+                          <TrendingUp className="w-4 h-4 text-red-500 shrink-0" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4 text-emerald-500 shrink-0" />
+                        )}
+                        <div>
+                          <div className="font-bold text-slate-800 dark:text-slate-200">{rc.road_name}</div>
+                          <div className="text-[10px] font-mono text-slate-400">
+                            {rc.previous_status} → <span className="font-bold text-slate-700 dark:text-slate-300">{rc.current_status}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <span className={clsx(
+                        "text-[10px] font-mono font-bold px-2 py-0.5 rounded border",
+                        rc.change_type === "WORSENED"
+                          ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300"
+                          : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300"
+                      )}>
+                        {rc.change_type}
+                      </span>
+                    </div>
+                  ))}
+                  {situationChanges?.water_level_changes?.map((wl, idx) => (
+                    <div key={`wl-${idx}`} className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      <span>{wl}</span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           </div>
         </div>
